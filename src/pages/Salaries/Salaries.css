@@ -1,0 +1,13 @@
+.cell-input { width: 90px; text-align: right; font-family: inherit; font-size: 13.5px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; }
+.print-only { display: none; }
+
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  .sidebar, .mobile-header, .mobile-drawer, .mobile-menu-overlay, .no-print { display: none !important; }
+  .print-only { display: block; margin: 0 0 8px; font-size: 16px; }
+  body { background: #fff; }
+  .page { padding: 0; }
+  .table-wrap { border: none; overflow: visible; }
+  table.pay th, table.pay td { font-size: 10.5px; padding: 3px 4px; }
+  .cell-input { border: none; width: 60px; padding: 0; }
+}

@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function me() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function approved() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && me().status == 'approved';
+    }
+    function approver() { return approved() && me().role in ['Admin', 'Director']; }
+
+    // --- first-account bootstrap marker -------------------------------
+    match /meta/bootstrap {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.firstUid == request.auth.uid;
+    }
+
+    // --- users ---------------------------------------------------------
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || approver());
+      // New account: pending, no role. The very first account may be an approved Admin
+      // (allowed only while meta/bootstrap does not exist yet).
+      allow create: if signedIn() && request.auth.uid == uid && (
+        (request.resource.data.status == 'pending' && request.resource.data.role == null)
+        || (!exists(/databases/$(database)/documents/meta/bootstrap)
+            && request.resource.data.status == 'approved'
+            && request.resource.data.role == 'Admin')
+      );
+      allow update, delete: if approver();
+    }
+
+    // --- employees -----------------------------------------------------
+    match /employees/{id} {
+      allow read: if approved();
+      allow write: if approver();
+    }
+
+    // --- attendance ----------------------------------------------------
+    // Approvers: anything. An Employee: only "Present" on their own record
+    // (matched by email). The "today only" check is enforced in the app.
+    match /attendance/{id} {
+      allow read: if approved();
+      allow write: if approver()
+        || (approved()
+            && request.resource.data.status == 'Present'
+            && get(/databases/$(database)/documents/employees/$(request.resource.data.employeeId)).data.email
+               == request.auth.token.email.lower());
+    }
+
+    // --- payroll -------------------------------------------------------
+    match /payroll/{month} {
+      allow read, write: if approved();
+    }
+    match /payrollEntries/{id} {
+      allow read, write: if approved();
+    }
+  }
+}
