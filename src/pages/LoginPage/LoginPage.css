@@ -38,3 +38,10 @@
   .paysheet { display: none; }
   .auth-brand h2 { font-size: 28px; max-width: none; }
 }
+
+.auth-brand {
+  position: relative; color: #fff; padding: 48px 56px; display: flex; flex-direction: column; justify-content: center; gap: 18px;
+  background:
+    linear-gradient(120deg, rgba(13, 59, 54, 0.80), rgba(10, 43, 40, 0.88)),
+    url("/login-bg.jpg") center / cover no-repeat;
+}

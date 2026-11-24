@@ -74,7 +74,7 @@ export default function EmployeeForm({ initial, existing, exceptId, submitLabel,
         </label>
         <label className="field">Date of birth<input type="date" max={todayStr()} value={f.dob} onChange={set("dob")} /></label>
         <label className="field">Age (auto)
-          <input value={ageFromDob(f.dob) === "" ? "" : `${ageFromDob(f.dob)} years`} readOnly tabIndex={-1} placeholder="Calculated from date of birth" />
+          <input value={ageFromDob(f.dob) === "" ? "" : `${ageFromDob(f.dob)} years`} readOnly tabIndex={-1}  />
         </label>
         <label className="field">Date of joining<input type="date" value={f.doj} onChange={set("doj")} /></label>
         <label className="field">Designation<input value={f.designation} onChange={set("designation")} /></label>
@@ -92,10 +92,10 @@ export default function EmployeeForm({ initial, existing, exceptId, submitLabel,
 
         {/* NEW: address + pincode */}
         <label className="field" style={{ gridColumn: "1 / -1" }}>Address
-          <textarea rows={3} value={f.address} onChange={set("address")} placeholder="House / street, area, city, state" />
+          <textarea rows={3} value={f.address} onChange={set("address")}  />
         </label>
         <label className="field">Pincode
-          <input value={f.pincode} onChange={setPincode} inputMode="numeric" maxLength={6} placeholder="6-digit pincode" />
+          <input value={f.pincode} onChange={setPincode} inputMode="numeric" maxLength={6}  />
         </label>
 
         <label className="field">Bank name<input value={f.bankName} onChange={set("bankName")} /></label>
