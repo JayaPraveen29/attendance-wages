@@ -13,32 +13,32 @@ import { thisMonth, datesOfMonth, monthLabel } from "../../lib/dates";
 import { toCsv, downloadCsv } from "../../lib/csv";
 import "./Salaries.css";
 
-const inr = (n) => Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const inr = (n) => Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
 // Present shown on the sheet = full days + half of each half day (e.g. 20 + 2 half days = 21)
 const presentDays = (r) => r.present + 0.5 * r.halfDay;
+// LP = working days - P - L (loss-of-pay days), as in the paysheet
+const lpDays = (r, wd) => (r.lp !== undefined ? r.lp : Math.max(0, wd - presentDays(r) - r.leave));
 
-// "Deductions" column = HRA + EPF + ESI + PT (shown beside those columns; Net pay is calculated separately)
-const deductionsCol = (r) => Math.round(((Number(r.hra) || 0) + (Number(r.epf) || 0) + (Number(r.esi) || 0) + (Number(r.pt) || 0) + Number.EPSILON) * 100) / 100;
 
-const CSV_COLUMNS = [
+const CSV_COLUMNS = (wd) => [
   { header: "Code", value: (r) => r.code },
-  { header: "Name", value: (r) => r.name },
+  { header: "Name of Employee", value: (r) => r.name },
   { header: "Group", value: (r) => r.group },
-  { header: "Gross", value: (r) => r.gross },
-  { header: "Present (half day = 0.5)", value: (r) => presentDays(r) },
-  { header: "Leave", value: (r) => r.leave },
-  { header: "Absent", value: (r) => r.absent },
-  { header: "Paid days", value: (r) => r.paidDays },
-  { header: "Earned", value: (r) => r.earned },
+  { header: "Gross Salary", value: (r) => r.gross },
+  { header: "P", value: (r) => presentDays(r) },
+  { header: "L", value: (r) => r.leave },
+  { header: "LP", value: (r) => lpDays(r, wd) },
+  { header: "Paid", value: (r) => r.paidDays },
+  { header: "Salary Payable", value: (r) => r.earned },
   { header: "HRA", value: (r) => r.hra },
+  { header: "Total Payable", value: (r) => r.totalEarnings },
+  { header: "Adv", value: (r) => r.advance },
   { header: "EPF", value: (r) => r.epf },
   { header: "ESI", value: (r) => r.esi },
   { header: "PT", value: (r) => r.pt },
-  { header: "Deductions (HRA+EPF+ESI+PT)", value: (r) => deductionsCol(r) },
-  { header: "Advance", value: (r) => r.advance },
-  { header: "Total deductions", value: (r) => r.totalDeductions },
-  { header: "Net pay", value: (r) => r.net },
+  { header: "Total Deductions", value: (r) => r.totalDeductions },
+  { header: "Bank Transfer", value: (r) => r.net },
   { header: "Bank", value: (r) => r.bankName },
   { header: "Account number", value: (r) => r.accountNumber },
   { header: "IFSC", value: (r) => r.ifsc },
@@ -78,8 +78,8 @@ export default function Salaries() {
     if (finalized) return payroll.snapshot || [];
     return employees
       .filter((e) => e.active || (counts[e.id] && Object.values(counts[e.id]).some(Boolean)))
-      .map((e) => computeRow({ employee: e, counts: counts[e.id], workingDays, entry: { ...(entries[e.id] || {}), ...(drafts[e.id] || {}) } }));
-  }, [employees, counts, entries, drafts, workingDays, finalized, payroll]);
+      .map((e) => computeRow({ employee: e, month, counts: counts[e.id], workingDays, entry: { ...(entries[e.id] || {}), ...(drafts[e.id] || {}) } }));
+  }, [employees, counts, entries, drafts, workingDays, finalized, payroll, month]);
 
   const total = (k) => sumRows(rows, k);
 
@@ -118,7 +118,7 @@ export default function Salaries() {
     catch (e) { fail(e); }
   };
 
-  const exportCsv = () => downloadCsv(`salaries-${month}.csv`, toCsv(rows, CSV_COLUMNS));
+  const exportCsv = () => downloadCsv(`salaries-${month}.csv`, toCsv(rows, CSV_COLUMNS(workingDays)));
 
   const cellInput = (r, k, placeholder) => {
     if (finalized) return inr(r[k]);
@@ -136,7 +136,7 @@ export default function Salaries() {
   return (
     <div className="page">
       <h1 className="no-print">Salaries</h1>
-      <p className="sub no-print">Paid days come from Attendance. P counts a Half day as 0.5 (Leave and Absent = 0).</p>
+      <p className="sub no-print">P and L come from Attendance (a Half day counts as 0.5 in P). Paid = P + L. LP = working days − P − L.</p>
       {notice.text && <div className={`msg ${notice.type} no-print`}>{notice.text}</div>}
 
       <div className="toolbar no-print">
@@ -179,11 +179,12 @@ export default function Salaries() {
         <table className="data pay">
           <thead>
             <tr>
-              <th>Code</th><th>Name</th><th className="num">Gross</th>
-              <th className="num">P</th><th className="num">L</th><th className="num">A</th>
-              <th className="num">Paid days</th><th className="num">Earned</th>
-              <th className="num">HRA</th><th className="num">EPF</th><th className="num">ESI</th>
-              <th className="num">PT</th><th className="num">Deductions</th><th className="num">Advance</th><th className="num">Net pay</th>
+              <th>Code</th><th>Name of Employee</th><th className="num">Gross Salary</th>
+              <th className="num">P</th><th className="num">L</th><th className="num">LP</th>
+              <th className="num">Paid</th><th className="num">Salary Payable</th>
+              <th className="num">HRA</th><th className="num">Total Payable</th>
+              <th className="num">Adv</th><th className="num">EPF</th><th className="num">ESI</th>
+              <th className="num">PT</th><th className="num">Total Deductions</th><th className="num">Bank Transfer</th>
             </tr>
           </thead>
           <tbody>
@@ -191,25 +192,27 @@ export default function Salaries() {
               <tr key={r.employeeId}>
                 <td>{r.code}</td><td>{r.name}</td><td className="num">{inr(r.gross)}</td>
                 <td className="num">{presentDays(r)}</td>
-                <td className="num">{r.leave}</td><td className="num">{r.absent}</td>
+                <td className="num">{r.leave}</td>
+                <td className="num">{lpDays(r, workingDays)}</td>
                 <td className="num">{r.paidDays}</td><td className="num">{inr(r.earned)}</td>
                 <td className="num">{cellInput(r, "hra", "0")}</td>
+                <td className="num">{inr(r.totalEarnings)}</td>
+                <td className="num">{cellInput(r, "advance", "0")}</td>
                 <td className="num">{inr(r.epf)}</td><td className="num">{inr(r.esi)}</td>
                 <td className="num">
                   {finalized ? inr(r.pt) : (
                     <input className="cell-input" type="number" min="0" step="0.01" placeholder={String(r.pt)}
-                      title={r.ptOverridden ? "Overridden — clear to use the slab amount" : "Auto from salary slab; type to override"}
+                      title={r.ptOverridden ? "Overridden — clear to use the slab amount" : "Auto from gross salary slab; type to override"}
                       value={merged(r.employeeId).pt ?? ""}
                       onChange={(e) => setDraft(r.employeeId, "pt", e.target.value)}
                       onBlur={() => commit(r.employeeId, "pt")} />
                   )}
                 </td>
-                <td className="num">{inr(deductionsCol(r))}</td>
-                <td className="num">{cellInput(r, "advance", "0")}</td>
+                <td className="num">{inr(r.totalDeductions)}</td>
                 <td className="num"><strong>{inr(r.net)}</strong></td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td colSpan={15} className="empty">No employees to show for this month yet.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={16} className="empty">No employees to show for this month yet.</td></tr>}
           </tbody>
           {rows.length > 0 && (
             <tfoot>
@@ -217,10 +220,9 @@ export default function Salaries() {
                 <td colSpan={2}>Total ({rows.length})</td>
                 <td className="num">{inr(total("gross"))}</td><td colSpan={4}></td>
                 <td className="num">{inr(total("earned"))}</td><td className="num">{inr(total("hra"))}</td>
+                <td className="num">{inr(total("totalEarnings"))}</td><td className="num">{inr(total("advance"))}</td>
                 <td className="num">{inr(total("epf"))}</td><td className="num">{inr(total("esi"))}</td>
-                <td className="num">{inr(total("pt"))}</td>
-                <td className="num">{inr(rows.reduce((a, r) => a + deductionsCol(r), 0))}</td>
-                <td className="num">{inr(total("advance"))}</td>
+                <td className="num">{inr(total("pt"))}</td><td className="num">{inr(total("totalDeductions"))}</td>
                 <td className="num">{inr(total("net"))}</td>
               </tr>
             </tfoot>

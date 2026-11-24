@@ -24,10 +24,14 @@ const todayStr = () => {
   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
 };
 
-export default function EmployeeForm({ initial, existing, exceptId, submitLabel, onSubmit, onCancel }) {
+const ADD_NEW = "__add_new_group__";
+
+export default function EmployeeForm({ initial, existing = [], exceptId, submitLabel, onSubmit, onCancel }) {
   const [f, setF] = useState({ ...EMPTY_EMPLOYEE, ...initial });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [addingGroup, setAddingGroup] = useState(false);
+  const [newGroup, setNewGroup] = useState("");
 
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
 
@@ -36,12 +40,20 @@ export default function EmployeeForm({ initial, existing, exceptId, submitLabel,
 
   const submit = async (e) => {
     e.preventDefault();
-    const problem = validateEmployee(f, existing, exceptId);
+    let data = f;
+    if (addingGroup) {
+      const name = newGroup.trim().replace(/\s+/g, " ");
+      if (!name) return setError("Enter the new group name, or pick an existing group.");
+      // If it matches an existing group (ignoring case), reuse that spelling.
+      const match = groupOptions.find((g) => g.toLowerCase() === name.toLowerCase());
+      data = { ...f, group: match || name };
+    }
+    const problem = validateEmployee(data, existing, exceptId);
     if (problem) return setError(problem);
     setError("");
     setBusy(true);
     try {
-      await onSubmit(f);
+      await onSubmit(data);
     } catch (err) {
       setError(err.message || "Could not save.");
     } finally {
@@ -51,7 +63,24 @@ export default function EmployeeForm({ initial, existing, exceptId, submitLabel,
 
   // If an older record has a group that is not in the list, keep it selectable
   // so editing that employee does not silently blank it.
-  const groupOptions = f.group && !GROUPS.includes(f.group) ? [f.group, ...GROUPS] : GROUPS;
+  // Groups created earlier by anyone (found on existing employees) are listed after "Others".
+  const customGroups = [...new Set(
+    [...existing.map((x) => x.group), f.group]
+      .map((g) => (g || "").trim())
+      .filter((g) => g && !GROUPS.some((d) => d.toLowerCase() === g.toLowerCase()))
+  )].sort((a, b) => a.localeCompare(b));
+  const groupOptions = [...GROUPS, ...customGroups];
+
+  const onGroupChange = (e) => {
+    if (e.target.value === ADD_NEW) {
+      setAddingGroup(true);
+      setF({ ...f, group: "" });
+    } else {
+      setAddingGroup(false);
+      setNewGroup("");
+      setF({ ...f, group: e.target.value });
+    }
+  };
 
   return (
     <form onSubmit={submit} className="emp-form">
@@ -73,8 +102,8 @@ export default function EmployeeForm({ initial, existing, exceptId, submitLabel,
           </select>
         </label>
         <label className="field">Date of birth<input type="date" max={todayStr()} value={f.dob} onChange={set("dob")} /></label>
-        <label className="field">Age (auto)
-          <input value={ageFromDob(f.dob) === "" ? "" : `${ageFromDob(f.dob)} years`} readOnly tabIndex={-1}  />
+        <label className="field">Age 
+          <input value={ageFromDob(f.dob) === "" ? "" : `${ageFromDob(f.dob)} years`} readOnly tabIndex={-1} />
         </label>
         <label className="field">Date of joining<input type="date" value={f.doj} onChange={set("doj")} /></label>
         <label className="field">Designation<input value={f.designation} onChange={set("designation")} /></label>
@@ -82,17 +111,23 @@ export default function EmployeeForm({ initial, existing, exceptId, submitLabel,
         <label className="field">PAN number<input value={f.pan} onChange={set("pan")} maxLength={10} style={{ textTransform: "uppercase" }} /></label>
         <label className="field">Email (optional)<input type="email" value={f.email} onChange={set("email")} /></label>
         <label className="field">Group
-          <select value={f.group} onChange={set("group")}>
+          <select value={addingGroup ? ADD_NEW : f.group} onChange={onGroupChange}>
             <option value="">Select group…</option>
             {groupOptions.map((g) => <option key={g} value={g}>{g}</option>)}
+            <option value={ADD_NEW}>+ Add new group…</option>
           </select>
         </label>
+        {addingGroup && (
+          <label className="field">New group name
+            <input value={newGroup} onChange={(e) => setNewGroup(e.target.value)} placeholder="e.g. Ravi Batch" autoFocus maxLength={40} />
+          </label>
+        )}
         <label className="field">Gross salary (₹ / month) *<input type="number" min="0" step="0.01" value={f.grossSalary} onChange={set("grossSalary")} /></label>
         <label className="field">Phone<input value={f.phone} onChange={set("phone")} inputMode="tel" /></label>
 
         {/* NEW: address + pincode */}
         <label className="field" style={{ gridColumn: "1 / -1" }}>Address
-          <textarea rows={3} value={f.address} onChange={set("address")}  />
+          <textarea rows={3} value={f.address} onChange={set("address")} />
         </label>
         <label className="field">Pincode
           <input value={f.pincode} onChange={setPincode} inputMode="numeric" maxLength={6}  />
