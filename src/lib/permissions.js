@@ -3,9 +3,10 @@
 // Single place for "who can do what". Change a rule here and it applies
 // everywhere (routing, nav, buttons).
 //
-//   Admin    (shown as "Web Dev / Admin") and Director -> full access + approvals
-//   Employee -> own attendance / own employee record, can mark self Present
-//               today, and (per the spec) can open Salaries.
+//   Admin    (shown as "Web Dev / Admin") and Director -> everything, including Approvals
+//   Employee -> full data entry (create / manage employees, attendance for anyone)
+//               and reports (Salaries: view, print, export, finalize).
+//               Employees can NOT open the Approvals page.
 
 export const ROLES = ["Admin", "Director", "Employee"];
 export const ROLE_LABELS = {
@@ -20,20 +21,23 @@ export const APPROVER_ROLES = ["Admin", "Director"];
 export const isApprover = (profile) =>
   !!profile && profile.status === "approved" && APPROVER_ROLES.includes(profile.role);
 
-// Create / edit / deactivate / delete employees
-export const canManageEmployees = isApprover;
+// Any approved user (Admin, Director or Employee)
+const DATA_ENTRY_ROLES = ["Admin", "Director", "Employee"];
+export const hasDataEntryAccess = (profile) =>
+  !!profile && profile.status === "approved" && DATA_ENTRY_ROLES.includes(profile.role);
 
-// Mark attendance for anyone on any date
-export const canMarkAnyAttendance = isApprover;
+// Create / edit / deactivate / delete employees  -> all approved roles
+export const canManageEmployees = hasDataEntryAccess;
+
+// Mark attendance for anyone on any date  -> all approved roles
+export const canMarkAnyAttendance = hasDataEntryAccess;
+
+// Salaries / reports: view/edit, print, export, finalize  -> all approved roles
+export const canUseSalaries = hasDataEntryAccess;
 
 // Approvals page (approve, reject, change roles, delete accounts)
+// -> ONLY Director and Admin / Web Dev
 export const canApprove = isApprover;
-
-// Salaries: view/edit, print, export, finalize, edit a finalized month.
-// Spec says every approved role can do this. To restrict it, change this.
-const SALARY_ROLES = ["Admin", "Director", "Employee"];
-export const canUseSalaries = (profile) =>
-  !!profile && profile.status === "approved" && SALARY_ROLES.includes(profile.role);
 
 // Landing page after login
 export const homePath = () => "/attendance";

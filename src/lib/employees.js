@@ -1,3 +1,15 @@
+// lib/employees.js
+//
+//   employees/{id} {
+//     name, code, email, group, grossSalary,
+//     gender, bloodGroup, dob, doj, designation, aadhar, pan,
+//     address, pincode,
+//     epf (bool), esi (bool),                 // is EPF / ESI deducted for this person
+//     bankName, accountNumber, ifsc, phone,
+//     active (bool), createdAt
+//   }
+// Email is just optional contact info. It is NOT linked to any login.
+
 import {
   collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy,
   where, getDocs, writeBatch, serverTimestamp,
@@ -46,17 +58,13 @@ function clean(f) {
 export function validateEmployee(f, list, exceptId = null) {
   if (!s(f.name)) return "Name is required.";
   if (!s(f.code)) return "Employee code is required.";
-  if (!/^\S+@\S+\.\S+$/.test(s(f.email))) return "A valid email is required.";
+  if (s(f.email) && !/^\S+@\S+\.\S+$/.test(s(f.email))) return "Email looks wrong.";
   if (!(Number(f.grossSalary) > 0)) return "Gross salary must be greater than 0.";
   if (s(f.phone) && !/^\+?[0-9 -]{7,15}$/.test(s(f.phone))) return "Phone number looks wrong.";
   if (s(f.pincode) && !/^[1-9][0-9]{5}$/.test(s(f.pincode))) return "Pincode must be a valid 6-digit number.";
   const code = s(f.code).toUpperCase();
   if (list.some((e) => e.id !== exceptId && (e.code || "").toUpperCase() === code)) {
     return `Employee code ${code} is already used.`;
-  }
-  const email = s(f.email).toLowerCase();
-  if (list.some((e) => e.id !== exceptId && (e.email || "").toLowerCase() === email)) {
-    return "Another employee already uses this email.";
   }
   return "";
 }

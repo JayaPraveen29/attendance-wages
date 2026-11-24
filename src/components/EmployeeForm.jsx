@@ -74,13 +74,13 @@ export default function EmployeeForm({ initial, existing, exceptId, submitLabel,
         </label>
         <label className="field">Date of birth<input type="date" max={todayStr()} value={f.dob} onChange={set("dob")} /></label>
         <label className="field">Age (auto)
-          <input value={ageFromDob(f.dob) === "" ? "" : `${ageFromDob(f.dob)} years`} readOnly tabIndex={-1} />
+          <input value={ageFromDob(f.dob) === "" ? "" : `${ageFromDob(f.dob)} years`} readOnly tabIndex={-1} placeholder="Calculated from date of birth" />
         </label>
         <label className="field">Date of joining<input type="date" value={f.doj} onChange={set("doj")} /></label>
         <label className="field">Designation<input value={f.designation} onChange={set("designation")} /></label>
         <label className="field">Aadhar number<input value={f.aadhar} onChange={set("aadhar")} inputMode="numeric" maxLength={14} /></label>
         <label className="field">PAN number<input value={f.pan} onChange={set("pan")} maxLength={10} style={{ textTransform: "uppercase" }} /></label>
-        <label className="field">Email *<input type="email" value={f.email} onChange={set("email")} /></label>
+        <label className="field">Email (optional)<input type="email" value={f.email} onChange={set("email")} /></label>
         <label className="field">Group
           <select value={f.group} onChange={set("group")}>
             <option value="">Select group…</option>
@@ -92,7 +92,7 @@ export default function EmployeeForm({ initial, existing, exceptId, submitLabel,
 
         {/* NEW: address + pincode */}
         <label className="field" style={{ gridColumn: "1 / -1" }}>Address
-          <textarea rows={3} value={f.address} onChange={set("address")} />
+          <textarea rows={3} value={f.address} onChange={set("address")} placeholder="House / street, area, city, state" />
         </label>
         <label className="field">Pincode
           <input value={f.pincode} onChange={setPincode} inputMode="numeric" maxLength={6} placeholder="6-digit pincode" />
