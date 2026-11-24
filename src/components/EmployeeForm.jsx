@@ -1,10 +1,28 @@
 import "./EmployeeForm.css";
+// components/EmployeeForm.jsx
+// Shared by Create Employee and the Edit dialog in Manage Employees.
 import { useState } from "react";
 import { EMPTY_EMPLOYEE, validateEmployee } from "../lib/employees";
 
 const GROUPS = ["SIEC", "ST", "IFPL", "Giri", "Kanchan", "Murali", "Bihar", "Others"];
 const GENDERS = ["Male", "Female"];
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
+// Age in whole years from a "YYYY-MM-DD" date of birth. Returns "" if DOB is empty/invalid.
+function ageFromDob(dob) {
+  if (!dob) return "";
+  const [y, m, d] = dob.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  const today = new Date();
+  let age = today.getFullYear() - y;
+  if (today.getMonth() + 1 < m || (today.getMonth() + 1 === m && today.getDate() < d)) age -= 1;
+  return age >= 0 ? age : "";
+}
+
+const todayStr = () => {
+  const t = new Date();
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+};
 
 export default function EmployeeForm({ initial, existing, exceptId, submitLabel, onSubmit, onCancel }) {
   const [f, setF] = useState({ ...EMPTY_EMPLOYEE, ...initial });
@@ -13,7 +31,7 @@ export default function EmployeeForm({ initial, existing, exceptId, submitLabel,
 
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
 
-  
+  // Pincode: digits only, max 6
   const setPincode = (e) => setF({ ...f, pincode: e.target.value.replace(/\D/g, "").slice(0, 6) });
 
   const submit = async (e) => {
@@ -31,6 +49,8 @@ export default function EmployeeForm({ initial, existing, exceptId, submitLabel,
     }
   };
 
+  // If an older record has a group that is not in the list, keep it selectable
+  // so editing that employee does not silently blank it.
   const groupOptions = f.group && !GROUPS.includes(f.group) ? [f.group, ...GROUPS] : GROUPS;
 
   return (
@@ -52,7 +72,10 @@ export default function EmployeeForm({ initial, existing, exceptId, submitLabel,
             {BLOOD_GROUPS.map((b) => <option key={b} value={b}>{b}</option>)}
           </select>
         </label>
-        <label className="field">Date of birth<input type="date" value={f.dob} onChange={set("dob")} /></label>
+        <label className="field">Date of birth<input type="date" max={todayStr()} value={f.dob} onChange={set("dob")} /></label>
+        <label className="field">Age (auto)
+          <input value={ageFromDob(f.dob) === "" ? "" : `${ageFromDob(f.dob)} years`} readOnly tabIndex={-1} />
+        </label>
         <label className="field">Date of joining<input type="date" value={f.doj} onChange={set("doj")} /></label>
         <label className="field">Designation<input value={f.designation} onChange={set("designation")} /></label>
         <label className="field">Aadhar number<input value={f.aadhar} onChange={set("aadhar")} inputMode="numeric" maxLength={14} /></label>
@@ -67,7 +90,7 @@ export default function EmployeeForm({ initial, existing, exceptId, submitLabel,
         <label className="field">Gross salary (₹ / month) *<input type="number" min="0" step="0.01" value={f.grossSalary} onChange={set("grossSalary")} /></label>
         <label className="field">Phone<input value={f.phone} onChange={set("phone")} inputMode="tel" /></label>
 
-     
+        {/* NEW: address + pincode */}
         <label className="field" style={{ gridColumn: "1 / -1" }}>Address
           <textarea rows={3} value={f.address} onChange={set("address")} />
         </label>

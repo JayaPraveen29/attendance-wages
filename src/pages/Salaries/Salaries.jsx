@@ -18,6 +18,9 @@ const inr = (n) => Number(n || 0).toLocaleString("en-IN", { minimumFractionDigit
 // Present shown on the sheet = full days + half of each half day (e.g. 20 + 2 half days = 21)
 const presentDays = (r) => r.present + 0.5 * r.halfDay;
 
+// "Deductions" column = HRA + EPF + ESI + PT (shown beside those columns; Net pay is calculated separately)
+const deductionsCol = (r) => Math.round(((Number(r.hra) || 0) + (Number(r.epf) || 0) + (Number(r.esi) || 0) + (Number(r.pt) || 0) + Number.EPSILON) * 100) / 100;
+
 const CSV_COLUMNS = [
   { header: "Code", value: (r) => r.code },
   { header: "Name", value: (r) => r.name },
@@ -32,6 +35,7 @@ const CSV_COLUMNS = [
   { header: "EPF", value: (r) => r.epf },
   { header: "ESI", value: (r) => r.esi },
   { header: "PT", value: (r) => r.pt },
+  { header: "Deductions (HRA+EPF+ESI+PT)", value: (r) => deductionsCol(r) },
   { header: "Advance", value: (r) => r.advance },
   { header: "Total deductions", value: (r) => r.totalDeductions },
   { header: "Net pay", value: (r) => r.net },
@@ -179,7 +183,7 @@ export default function Salaries() {
               <th className="num">P</th><th className="num">L</th><th className="num">A</th>
               <th className="num">Paid days</th><th className="num">Earned</th>
               <th className="num">HRA</th><th className="num">EPF</th><th className="num">ESI</th>
-              <th className="num">PT</th><th className="num">Advance</th><th className="num">Net pay</th>
+              <th className="num">PT</th><th className="num">Deductions</th><th className="num">Advance</th><th className="num">Net pay</th>
             </tr>
           </thead>
           <tbody>
@@ -200,11 +204,12 @@ export default function Salaries() {
                       onBlur={() => commit(r.employeeId, "pt")} />
                   )}
                 </td>
+                <td className="num">{inr(deductionsCol(r))}</td>
                 <td className="num">{cellInput(r, "advance", "0")}</td>
                 <td className="num"><strong>{inr(r.net)}</strong></td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td colSpan={14} className="empty">No employees to show for this month yet.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={15} className="empty">No employees to show for this month yet.</td></tr>}
           </tbody>
           {rows.length > 0 && (
             <tfoot>
@@ -213,7 +218,9 @@ export default function Salaries() {
                 <td className="num">{inr(total("gross"))}</td><td colSpan={4}></td>
                 <td className="num">{inr(total("earned"))}</td><td className="num">{inr(total("hra"))}</td>
                 <td className="num">{inr(total("epf"))}</td><td className="num">{inr(total("esi"))}</td>
-                <td className="num">{inr(total("pt"))}</td><td className="num">{inr(total("advance"))}</td>
+                <td className="num">{inr(total("pt"))}</td>
+                <td className="num">{inr(rows.reduce((a, r) => a + deductionsCol(r), 0))}</td>
+                <td className="num">{inr(total("advance"))}</td>
                 <td className="num">{inr(total("net"))}</td>
               </tr>
             </tfoot>
