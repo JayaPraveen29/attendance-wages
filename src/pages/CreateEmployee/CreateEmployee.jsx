@@ -19,7 +19,7 @@ export default function CreateEmployee() {
   return (
     <div className="page">
       <h1>Create employee</h1>
-      <p className="sub">Enter the employee details. Email is optional and is not linked to any login.</p>
+      <p className="sub">Enter the employee details.</p>
       {notice && <div className="msg ok">{notice}</div>}
       <div className="card">
         <EmployeeForm key={formKey} existing={employees} submitLabel="Add employee" onSubmit={save} />
