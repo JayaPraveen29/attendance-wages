@@ -109,7 +109,7 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
         <label className="field">Designation<input value={f.designation} onChange={set("designation")} /></label>
         <label className="field">Aadhar number<input value={f.aadhar} onChange={set("aadhar")} inputMode="numeric" maxLength={14} /></label>
         <label className="field">PAN number<input value={f.pan} onChange={set("pan")} maxLength={10} style={{ textTransform: "uppercase" }} /></label>
-        <label className="field">Email (optional)<input type="email" value={f.email} onChange={set("email")} /></label>
+        <label className="field">Email<input type="email" value={f.email} onChange={set("email")} /></label>
         <label className="field">Group
           <select value={addingGroup ? ADD_NEW : f.group} onChange={onGroupChange}>
             <option value="">Select group…</option>
@@ -119,7 +119,7 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
         </label>
         {addingGroup && (
           <label className="field">New group name
-            <input value={newGroup} onChange={(e) => setNewGroup(e.target.value)} placeholder="e.g. Ravi Batch" autoFocus maxLength={40} />
+            <input value={newGroup} onChange={(e) => setNewGroup(e.target.value)} autoFocus maxLength={40} />
           </label>
         )}
         <label className="field">Gross salary (₹ / month) *<input type="number" min="0" step="0.01" value={f.grossSalary} onChange={set("grossSalary")} /></label>
