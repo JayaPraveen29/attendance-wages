@@ -1,7 +1,8 @@
 // lib/employees.js
 //
 //   employees/{id} {
-//     name, code, email, group, grossSalary,
+//     name, code, email, group, unit, category, grossSalary,
+//     actualSalary, statutorySalary, professionalTax, otApplicable (Workers),
 //     gender, bloodGroup, dob, doj, designation, aadhar, pan,
 //     address, pincode,
 //     epf (bool), esi (bool),                 // is EPF / ESI deducted for this person
@@ -20,9 +21,11 @@ const COL = "employees";
 
 export const EMPTY_EMPLOYEE = {
   name: "", code: "", email: "", group: "", grossSalary: "",
+  unit: "", category: "",
+  actualSalary: "", statutorySalary: "", professionalTax: 0, otApplicable: true,
   gender: "", bloodGroup: "", dob: "", doj: "", designation: "",
   aadhar: "", pan: "",
-  address: "", pincode: "",
+  address: "", co: "", houseNo: "", village: "", mandal: "", district: "", state: "", pincode: "",
   epf: true, esi: false,
   bankName: "", accountNumber: "", ifsc: "", phone: "",
 };
@@ -35,7 +38,13 @@ function clean(f) {
     code: s(f.code).toUpperCase(),
     email: s(f.email).toLowerCase(),
     group: s(f.group),
+    unit: s(f.unit),
+    category: s(f.category),
     grossSalary: Number(f.grossSalary) || 0,
+    actualSalary: Number(f.actualSalary) || 0,
+    statutorySalary: Number(f.statutorySalary) || 0,
+    professionalTax: Number(f.professionalTax) || 0,
+    otApplicable: f.otApplicable !== false,
     gender: s(f.gender),
     bloodGroup: s(f.bloodGroup),
     dob: s(f.dob),
@@ -44,6 +53,12 @@ function clean(f) {
     aadhar: s(f.aadhar),
     pan: s(f.pan).toUpperCase(),
     address: s(f.address),
+    co: s(f.co),
+    houseNo: s(f.houseNo),
+    village: s(f.village),
+    mandal: s(f.mandal),
+    district: s(f.district),
+    state: s(f.state),
     pincode: s(f.pincode),
     epf: !!f.epf,
     esi: !!f.esi,
