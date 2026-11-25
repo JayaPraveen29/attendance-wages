@@ -6,6 +6,11 @@ import EmployeeForm from "../../components/EmployeeForm";
 const UNITS = ["Unit 1", "Unit 2"];
 const CATEGORIES = ["Directors", "Admin Staff", "Field Staff", "Workers", "Casuals"];
 const isWorker = (e) => e.category === "Workers";
+// "123456789012" -> "1234 5678 9012"
+const fmtAadhar = (v) => {
+  const d = String(v || "").replace(/\D/g, "").slice(0, 12);
+  return d ? d.replace(/(\d{4})(?=\d)/g, "$1 ") : "";
+};
 const inr = (n) => Number(n || 0).toLocaleString("en-IN");
 const dash = (v) => (v === undefined || v === null || v === "" ? "—" : v);
 // "2000-03-25" -> "25-03-2000"
@@ -120,7 +125,7 @@ export default function ManageEmployees() {
           <thead>
             <tr>
               <th>Employee ID</th><th>Name</th><th>Designation</th><th>Group</th><th>Unit</th><th>Category</th><th>Phone</th><th>Email</th>
-              <th className="num">Salary ₹</th><th className="num">Paysheet salary ₹</th><th className="num">PT ₹</th><th>EPF</th><th>ESI</th><th>OT</th><th>Status</th><th>Actions</th>
+              <th className="num">Salary ₹</th><th className="num">Paysheet ₹</th><th className="num">PT ₹</th><th>EPF</th><th>ESI</th><th>OT</th><th>Status</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -189,7 +194,7 @@ export default function ManageEmployees() {
               {isWorker(viewed) ? (
                 <>
                   <Detail label="Salary (₹ / month)" value={inr(viewed.actualSalary ?? viewed.grossSalary)} />
-                  <Detail label="Paysheet salary (₹ / month)" value={inr(viewed.statutorySalary)} />
+                  <Detail label="Paysheet (₹ / month)" value={inr(viewed.statutorySalary)} />
                   <Detail label="Professional tax (₹ / month)" value={inr(viewed.professionalTax)} />
                   <Detail label="OT applicable" value={viewed.otApplicable === false ? "No" : "Yes"} />
                 </>
@@ -201,8 +206,18 @@ export default function ManageEmployees() {
             </Section>
 
             <Section title="Identity">
-              <Detail label="Aadhar number" value={viewed.aadhar} />
-              <Detail label="PAN number" value={viewed.pan} />
+              <Detail label="Aadhar number" value={fmtAadhar(viewed.aadhar)} />
+              <Detail label="PAN number" value={(viewed.pan || "").toUpperCase()} />
+            </Section>
+
+            <Section title="Address">
+              <Detail label="C/o" value={viewed.co} />
+              <Detail label="H.No" value={viewed.houseNo} />
+              <Detail label="Village/Town" value={viewed.village} />
+              <Detail label="Mandal/Tahsil" value={viewed.mandal} />
+              <Detail label="District" value={viewed.district} />
+              <Detail label="State" value={viewed.state} />
+              <Detail label="Pin code" value={viewed.pincode} />
             </Section>
 
             <Section title="Bank">

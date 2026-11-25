@@ -65,6 +65,13 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
 
   // Pincode: digits only, max 6
+  // Aadhar: digits only, max 12, shown as "1234 5678 9012" (space after every 4 digits)
+  const fmtAadhar = (v) => String(v || "").replace(/\D/g, "").slice(0, 12).replace(/(\d{4})(?=\d)/g, "$1 ");
+  const setAadhar = (e) => setF({ ...f, aadhar: fmtAadhar(e.target.value) });
+
+  // PAN: letters and digits only, always capital letters, max 10
+  const setPan = (e) => setF({ ...f, pan: e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 10) });
+
   const setPincode = (e) => setF({ ...f, pincode: e.target.value.replace(/\D/g, "").slice(0, 6) });
 
   const submit = async (e) => {
@@ -81,7 +88,7 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
     if (!data.category) return setError("Select a category (Directors, Admin Staff, Field Staff, Workers or Casuals).");
     if (SALARY_TYPE_CATEGORIES.includes(data.category)) {
       if (!(Number(data.actualSalary) > 0)) return setError("Enter the salary.");
-      if (!(Number(data.statutorySalary) > 0)) return setError("Enter the paysheet salary.");
+      if (!(Number(data.statutorySalary) > 0)) return setError("Enter the paysheet amount.");
       data = {
         ...data,
         actualSalary: Number(data.actualSalary),
@@ -166,8 +173,8 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
         </label>
         <label className="field">Date of joining<input type="date" value={f.doj} onChange={set("doj")} /></label>
         <label className="field">Designation<input value={f.designation} onChange={set("designation")} /></label>
-        <label className="field">Aadhar number<input value={f.aadhar} onChange={set("aadhar")} inputMode="numeric" maxLength={14} /></label>
-        <label className="field">PAN number<input value={f.pan} onChange={set("pan")} maxLength={10} style={{ textTransform: "uppercase" }} /></label>
+        <label className="field">Aadhar number<input value={fmtAadhar(f.aadhar)} onChange={setAadhar} inputMode="numeric" maxLength={14} /></label>
+        <label className="field">PAN number<input value={(f.pan || "").toUpperCase()} onChange={setPan} maxLength={10} style={{ textTransform: "uppercase" }} /></label>
         <label className="field">Email (optional)<input type="email" value={f.email} onChange={set("email")} /></label>
         <label className="field">Group
           <select value={addingGroup ? ADD_NEW : f.group} onChange={onGroupChange}>
@@ -212,7 +219,7 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
             <label className="field">Salary (₹ / month) *
               <input type="number" min="0" step="0.01" value={f.actualSalary} onChange={set("actualSalary")} />
             </label>
-            <label className="field">Paysheet salary (₹ / month) *
+            <label className="field">Paysheet (₹ / month) *
               <input type="number" min="0" step="0.01" value={f.statutorySalary} onChange={set("statutorySalary")} />
             </label>
             <label className="field">Professional tax (₹ / month)
@@ -225,8 +232,8 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
         {/* Address, split into parts */}
         <label className="field">C/o<input value={f.co} onChange={set("co")}  /></label>
         <label className="field">H.No<input value={f.houseNo} onChange={set("houseNo")} /></label>
-        <label className="field">Village<input value={f.village} onChange={set("village")} /></label>
-        <label className="field">Mandal<input value={f.mandal} onChange={set("mandal")} /></label>
+        <label className="field">Village/Town<input value={f.village} onChange={set("village")} /></label>
+        <label className="field">Mandal/Tahsil<input value={f.mandal} onChange={set("mandal")} /></label>
         <label className="field">District<input value={f.district} onChange={set("district")} /></label>
         <label className="field">State<input value={f.state} onChange={set("state")} /></label>
         <label className="field">Pin code
