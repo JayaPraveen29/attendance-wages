@@ -102,14 +102,14 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
           </select>
         </label>
         <label className="field">Date of birth<input type="date" max={todayStr()} value={f.dob} onChange={set("dob")} /></label>
-        <label className="field">Age 
-          <input value={ageFromDob(f.dob) === "" ? "" : `${ageFromDob(f.dob)} years`} readOnly tabIndex={-1} />
+        <label className="field">Age
+          <input value={ageFromDob(f.dob) === "" ? "" : `${ageFromDob(f.dob)} years`} readOnly tabIndex={-1}  />
         </label>
         <label className="field">Date of joining<input type="date" value={f.doj} onChange={set("doj")} /></label>
         <label className="field">Designation<input value={f.designation} onChange={set("designation")} /></label>
         <label className="field">Aadhar number<input value={f.aadhar} onChange={set("aadhar")} inputMode="numeric" maxLength={14} /></label>
         <label className="field">PAN number<input value={f.pan} onChange={set("pan")} maxLength={10} style={{ textTransform: "uppercase" }} /></label>
-        <label className="field">Email<input type="email" value={f.email} onChange={set("email")} /></label>
+        <label className="field">Email (optional)<input type="email" value={f.email} onChange={set("email")} /></label>
         <label className="field">Group
           <select value={addingGroup ? ADD_NEW : f.group} onChange={onGroupChange}>
             <option value="">Select group…</option>
@@ -119,18 +119,21 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
         </label>
         {addingGroup && (
           <label className="field">New group name
-            <input value={newGroup} onChange={(e) => setNewGroup(e.target.value)} autoFocus maxLength={40} />
+            <input value={newGroup} onChange={(e) => setNewGroup(e.target.value)}  autoFocus maxLength={40} />
           </label>
         )}
         <label className="field">Gross salary (₹ / month) *<input type="number" min="0" step="0.01" value={f.grossSalary} onChange={set("grossSalary")} /></label>
         <label className="field">Phone<input value={f.phone} onChange={set("phone")} inputMode="tel" /></label>
 
-        {/* NEW: address + pincode */}
-        <label className="field" style={{ gridColumn: "1 / -1" }}>Address
-          <textarea rows={3} value={f.address} onChange={set("address")} />
-        </label>
-        <label className="field">Pincode
-          <input value={f.pincode} onChange={setPincode} inputMode="numeric" maxLength={6}  />
+        {/* Address, split into parts */}
+        <label className="field">C/o<input value={f.co} onChange={set("co")}  /></label>
+        <label className="field">H.No<input value={f.houseNo} onChange={set("houseNo")} /></label>
+        <label className="field">Village<input value={f.village} onChange={set("village")} /></label>
+        <label className="field">Mandal<input value={f.mandal} onChange={set("mandal")} /></label>
+        <label className="field">District<input value={f.district} onChange={set("district")} /></label>
+        <label className="field">State<input value={f.state} onChange={set("state")} /></label>
+        <label className="field">Pin code
+          <input value={f.pincode} onChange={setPincode} inputMode="numeric" maxLength={6} placeholder="6-digit pin code" />
         </label>
 
         <label className="field">Bank name<input value={f.bankName} onChange={set("bankName")} /></label>

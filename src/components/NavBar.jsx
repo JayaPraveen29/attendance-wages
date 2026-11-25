@@ -9,7 +9,7 @@ import {
 } from "../lib/permissions";
 import "./NavBar.css";
 
-const BRAND = "SIEC Payroll";
+const BRAND = "Payroll Management";
 
 const ICONS = {
   attendance: <path d="M8 2v3M16 2v3M3 9h18M5 4h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm4 11 2 2 4-4" />,
