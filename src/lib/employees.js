@@ -27,7 +27,7 @@ export const EMPTY_EMPLOYEE = {
   aadhar: "", pan: "",
   address: "", co: "", houseNo: "", village: "", mandal: "", district: "", state: "", pincode: "",
   epf: true, esi: false,
-  bankName: "", accountNumber: "", ifsc: "", phone: "",
+  bankName: "", branchName: "", accountNumber: "", ifsc: "", phone: "",
 };
 
 const s = (v) => (v == null ? "" : String(v)).trim();
@@ -63,6 +63,7 @@ function clean(f) {
     epf: !!f.epf,
     esi: !!f.esi,
     bankName: s(f.bankName),
+    branchName: s(f.branchName),
     accountNumber: s(f.accountNumber),
     ifsc: s(f.ifsc).toUpperCase(),
     phone: s(f.phone),
@@ -74,7 +75,7 @@ export function validateEmployee(f, list, exceptId = null) {
   if (!s(f.name)) return "Name is required.";
   if (!s(f.code)) return "Employee code is required.";
   if (s(f.email) && !/^\S+@\S+\.\S+$/.test(s(f.email))) return "Email looks wrong.";
-  if (!(Number(f.grossSalary) > 0)) return "Gross salary must be greater than 0.";
+  if (!(Number(f.grossSalary) > 0)) return "Salary must be greater than 0.";
   if (s(f.phone) && !/^\+?[0-9 -]{7,15}$/.test(s(f.phone))) return "Phone number looks wrong.";
   if (s(f.pincode) && !/^[1-9][0-9]{5}$/.test(s(f.pincode))) return "Pincode must be a valid 6-digit number.";
   const code = s(f.code).toUpperCase();

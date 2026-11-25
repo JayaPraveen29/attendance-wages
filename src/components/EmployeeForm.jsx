@@ -8,11 +8,11 @@ const GROUPS = ["SIEC", "ST", "IFPL", "Giri", "Kanchan", "Murali", "Bihar", "Oth
 const GENDERS = ["Male", "Female"];
 const UNITS = ["Unit 1", "Unit 2"];
 const CATEGORIES = ["Directors", "Admin Staff", "Field Staff", "Workers", "Casuals"];
-// Categories that have two salaries (Actual and Statutory) instead of one gross salary.
+// Categories that have two salaries (Salary and Paysheet salary) instead of one gross salary.
 // Change this list if the category is called something else.
 const SALARY_TYPE_CATEGORIES = ["Workers"];
 
-// Professional tax slab (per month), applied to statutory salary only:
+// Professional tax slab (per month), applied to paysheet salary only:
 //   below 15,000 -> 0 | 15,000 to 20,000 -> 150 | above 20,000 -> 200
 export function professionalTax(salary) {
   const n = Number(salary) || 0;
@@ -51,7 +51,7 @@ const todayStr = () => {
 const ADD_NEW = "__add_new_group__";
 
 export default function EmployeeForm({ initial, existing = [], exceptId, submitLabel, onSubmit, onCancel }) {
-  const [f, setF] = useState({ unit: "", category: "", actualSalary: "", statutorySalary: "", professionalTax: 0, otApplicable: true, ...EMPTY_EMPLOYEE, ...initial });
+  const [f, setF] = useState({ unit: "", category: "", branchName: "", actualSalary: "", statutorySalary: "", professionalTax: 0, otApplicable: true, ...EMPTY_EMPLOYEE, ...initial });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [addingGroup, setAddingGroup] = useState(false);
@@ -80,8 +80,8 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
     if (!data.unit) return setError("Select a unit (Unit 1 or Unit 2).");
     if (!data.category) return setError("Select a category (Directors, Admin Staff, Field Staff, Workers or Casuals).");
     if (SALARY_TYPE_CATEGORIES.includes(data.category)) {
-      if (!(Number(data.actualSalary) > 0)) return setError("Enter the actual salary.");
-      if (!(Number(data.statutorySalary) > 0)) return setError("Enter the statutory salary.");
+      if (!(Number(data.actualSalary) > 0)) return setError("Enter the salary.");
+      if (!(Number(data.statutorySalary) > 0)) return setError("Enter the paysheet salary.");
       data = {
         ...data,
         actualSalary: Number(data.actualSalary),
@@ -205,14 +205,14 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
           </select>
         </label>
         {!needsSalaryType && (
-          <label className="field">Gross salary (₹ / month) *<input type="number" min="0" step="0.01" value={f.grossSalary} onChange={set("grossSalary")} /></label>
+          <label className="field">Salary (₹ / month) *<input type="number" min="0" step="0.01" value={f.grossSalary} onChange={set("grossSalary")} /></label>
         )}
         {needsSalaryType && (
           <>
-            <label className="field">Actual salary (₹ / month) *
+            <label className="field">Salary (₹ / month) *
               <input type="number" min="0" step="0.01" value={f.actualSalary} onChange={set("actualSalary")} />
             </label>
-            <label className="field">Statutory salary (₹ / month) *
+            <label className="field">Paysheet salary (₹ / month) *
               <input type="number" min="0" step="0.01" value={f.statutorySalary} onChange={set("statutorySalary")} />
             </label>
             <label className="field">Professional tax (₹ / month)
@@ -225,8 +225,8 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
         {/* Address, split into parts */}
         <label className="field">C/o<input value={f.co} onChange={set("co")}  /></label>
         <label className="field">H.No<input value={f.houseNo} onChange={set("houseNo")} /></label>
-        <label className="field">Village/town<input value={f.village} onChange={set("village")} /></label>
-        <label className="field">Mandal/Tahsil<input value={f.mandal} onChange={set("mandal")} /></label>
+        <label className="field">Village<input value={f.village} onChange={set("village")} /></label>
+        <label className="field">Mandal<input value={f.mandal} onChange={set("mandal")} /></label>
         <label className="field">District<input value={f.district} onChange={set("district")} /></label>
         <label className="field">State<input value={f.state} onChange={set("state")} /></label>
         <label className="field">Pin code
@@ -234,6 +234,7 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
         </label>
 
         <label className="field">Bank name<input value={f.bankName} onChange={set("bankName")} /></label>
+        <label className="field">Branch name<input value={f.branchName} onChange={set("branchName")} /></label>
         <label className="field">Account number<input value={f.accountNumber} onChange={set("accountNumber")} inputMode="numeric" /></label>
         <label className="field">IFSC<input value={f.ifsc} onChange={set("ifsc")} /></label>
       </div>

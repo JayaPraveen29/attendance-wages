@@ -120,7 +120,7 @@ export default function ManageEmployees() {
           <thead>
             <tr>
               <th>Employee ID</th><th>Name</th><th>Designation</th><th>Group</th><th>Unit</th><th>Category</th><th>Phone</th><th>Email</th>
-              <th className="num">Gross / Actual ₹</th><th className="num">Statutory ₹</th><th className="num">PT ₹</th><th>EPF</th><th>ESI</th><th>OT</th><th>Status</th><th>Actions</th>
+              <th className="num">Salary ₹</th><th className="num">Paysheet salary ₹</th><th className="num">PT ₹</th><th>EPF</th><th>ESI</th><th>OT</th><th>Status</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -188,13 +188,13 @@ export default function ManageEmployees() {
               <Detail label="Date of joining" value={fmtDate(viewed.doj)} />
               {isWorker(viewed) ? (
                 <>
-                  <Detail label="Actual salary (₹ / month)" value={inr(viewed.actualSalary ?? viewed.grossSalary)} />
-                  <Detail label="Statutory salary (₹ / month)" value={inr(viewed.statutorySalary)} />
+                  <Detail label="Salary (₹ / month)" value={inr(viewed.actualSalary ?? viewed.grossSalary)} />
+                  <Detail label="Paysheet salary (₹ / month)" value={inr(viewed.statutorySalary)} />
                   <Detail label="Professional tax (₹ / month)" value={inr(viewed.professionalTax)} />
                   <Detail label="OT applicable" value={viewed.otApplicable === false ? "No" : "Yes"} />
                 </>
               ) : (
-                <Detail label="Gross salary (₹ / month)" value={inr(viewed.grossSalary)} />
+                <Detail label="Salary (₹ / month)" value={inr(viewed.grossSalary)} />
               )}
               <Detail label="EPF applicable" value={viewed.epf ? "Yes" : "No"} />
               <Detail label="ESI applicable" value={viewed.esi ? "Yes" : "No"} />
@@ -207,6 +207,7 @@ export default function ManageEmployees() {
 
             <Section title="Bank">
               <Detail label="Bank name" value={viewed.bankName} />
+              <Detail label="Branch name" value={viewed.branchName} />
               <Detail label="Account number" value={viewed.accountNumber} />
               <Detail label="IFSC" value={viewed.ifsc} />
             </Section>
