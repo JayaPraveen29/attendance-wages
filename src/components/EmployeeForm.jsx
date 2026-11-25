@@ -113,7 +113,7 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
         <label className="field">Designation<input value={f.designation} onChange={set("designation")} /></label>
         <label className="field">Aadhar number<input value={f.aadhar} onChange={set("aadhar")} inputMode="numeric" maxLength={14} /></label>
         <label className="field">PAN number<input value={f.pan} onChange={set("pan")} maxLength={10} style={{ textTransform: "uppercase" }} /></label>
-        <label className="field">Email (optional)<input type="email" value={f.email} onChange={set("email")} /></label>
+        <label className="field">Email <input type="email" value={f.email} onChange={set("email")} /></label>
         <label className="field">Group
           <select value={addingGroup ? ADD_NEW : f.group} onChange={onGroupChange}>
             <option value="">Select group…</option>
@@ -149,7 +149,7 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
         <label className="field">District<input value={f.district} onChange={set("district")} /></label>
         <label className="field">State<input value={f.state} onChange={set("state")} /></label>
         <label className="field">Pin code
-          <input value={f.pincode} onChange={setPincode} inputMode="numeric" maxLength={6} placeholder="6-digit pin code" />
+          <input value={f.pincode} onChange={setPincode} inputMode="numeric" maxLength={6} />
         </label>
 
         <label className="field">Bank name<input value={f.bankName} onChange={set("bankName")} /></label>
