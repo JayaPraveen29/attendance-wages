@@ -48,10 +48,11 @@ const todayStr = () => {
   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
 };
 
+const DEFAULT_EMAIL = "@gmail.com";
 const ADD_NEW = "__add_new_group__";
 
 export default function EmployeeForm({ initial, existing = [], exceptId, submitLabel, onSubmit, onCancel }) {
-  const [f, setF] = useState({ unit: "", category: "", branchName: "", postOffice: "", policeStation: "", actualSalary: "", statutorySalary: "", professionalTax: 0, otApplicable: true, ...EMPTY_EMPLOYEE, ...initial });
+  const [f, setF] = useState({ unit: "", category: "", branchName: "", postOffice: "", policeStation: "", actualSalary: "", statutorySalary: "", professionalTax: 0, otApplicable: true, ...EMPTY_EMPLOYEE, ...(initial ? {} : { email: DEFAULT_EMAIL }), ...initial });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [addingGroup, setAddingGroup] = useState(false);
@@ -77,6 +78,8 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
   const submit = async (e) => {
     e.preventDefault();
     let data = f;
+    // an untouched "@gmail.com" means no email was entered
+    if ((data.email || "").trim().toLowerCase() === DEFAULT_EMAIL) data = { ...data, email: "" };
     if (addingGroup) {
       const name = newGroup.trim().replace(/\s+/g, " ");
       if (!name) return setError("Enter the new group name, or pick an existing group.");
@@ -172,10 +175,17 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
           <input value={ageFromDob(f.dob) === "" ? "" : `${ageFromDob(f.dob)} years`} readOnly tabIndex={-1}  />
         </label>
         <label className="field">Date of joining<input type="date" value={f.doj} onChange={set("doj")} /></label>
-        <label className="field">Designation<input value={f.designation} onChange={set("designation")} /></label>
         <label className="field">Aadhar number<input value={fmtAadhar(f.aadhar)} onChange={setAadhar} inputMode="numeric" maxLength={14} /></label>
         <label className="field">PAN number<input value={(f.pan || "").toUpperCase()} onChange={setPan} maxLength={10} style={{ textTransform: "uppercase" }} /></label>
-        <label className="field">Email<input type="email" value={f.email} onChange={set("email")} /></label>
+        <label className="field">Email
+          <input
+            type="text"
+            inputMode="email"
+            value={f.email}
+            onChange={set("email")}
+            onFocus={(e) => { if (e.target.value === DEFAULT_EMAIL) e.target.setSelectionRange(0, 0); }}
+          />
+        </label>
         <label className="field">Group
           <select value={addingGroup ? ADD_NEW : f.group} onChange={onGroupChange}>
             <option value="">Select group…</option>
@@ -211,6 +221,7 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
             {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </label>
+        <label className="field">Designation<input value={f.designation} onChange={set("designation")} /></label>
         {!needsSalaryType && (
           <label className="field">Salary (₹ / month) *<input type="number" min="0" step="0.01" value={f.grossSalary} onChange={set("grossSalary")} /></label>
         )}

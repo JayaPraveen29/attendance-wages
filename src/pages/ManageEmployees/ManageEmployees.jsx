@@ -128,7 +128,7 @@ export default function ManageEmployees() {
         <table className="data">
           <thead>
             <tr>
-              <th>Employee ID</th><th>Name</th><th>Designation</th><th>Group</th><th>Unit</th><th>Category</th><th>Phone</th><th>Email</th>
+              <th>Employee ID</th><th>Name</th><th>Group</th><th>Unit</th><th>Category</th><th>Designation</th><th>Phone</th><th>Email</th>
               <th className="num">Salary ₹</th><th className="num">Paysheet ₹</th><th className="num">PT ₹</th><th>EPF</th><th>ESI</th><th>OT</th><th>Status</th><th>Actions</th>
             </tr>
           </thead>
@@ -137,10 +137,10 @@ export default function ManageEmployees() {
               <tr key={e.id}>
                 <td>{e.code}</td>
                 <td><strong>{e.name}</strong></td>
-                <td>{dash(e.designation)}</td>
                 <td>{dash(e.group)}</td>
                 <td>{dash(e.unit)}</td>
                 <td>{dash(e.category)}</td>
+                <td>{dash(e.designation)}</td>
                 <td>{dash(e.phone)}</td>
                 <td>{e.email}</td>
                 <td className="num">{inr(isWorker(e) ? e.actualSalary ?? e.grossSalary : e.grossSalary)}</td>
@@ -190,10 +190,10 @@ export default function ManageEmployees() {
 
             <Section title="Employment">
               <Detail label="Employee ID" value={viewed.code} />
-              <Detail label="Designation" value={viewed.designation} />
               <Detail label="Group" value={viewed.group} />
               <Detail label="Unit" value={viewed.unit} />
               <Detail label="Category" value={viewed.category} />
+              <Detail label="Designation" value={viewed.designation} />
               <Detail label="Date of joining" value={fmtDate(viewed.doj)} />
               {isWorker(viewed) ? (
                 <>
