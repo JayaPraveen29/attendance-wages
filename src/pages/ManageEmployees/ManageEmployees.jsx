@@ -3,6 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import { listenEmployees, updateEmployee, setEmployeeActive, deleteEmployee } from "../../lib/employees";
 import EmployeeForm from "../../components/EmployeeForm";
 
+const UNITS = ["Unit 1", "Unit 2"];
+const CATEGORIES = ["Directors", "Admin Staff", "Field Staff", "Workers", "Casuals"];
+const isWorker = (e) => e.category === "Workers";
 const inr = (n) => Number(n || 0).toLocaleString("en-IN");
 const dash = (v) => (v === undefined || v === null || v === "" ? "—" : v);
 // "2000-03-25" -> "25-03-2000"
@@ -35,6 +38,8 @@ export default function ManageEmployees() {
   const [search, setSearch] = useState("");
   const [show, setShow] = useState("all"); // all | active | inactive
   const [groupFilter, setGroupFilter] = useState("all");
+  const [unitFilter, setUnitFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [viewing, setViewing] = useState(null);
   const [editing, setEditing] = useState(null);
   const [notice, setNotice] = useState({ type: "", text: "" });
@@ -52,12 +57,14 @@ export default function ManageEmployees() {
       if (show === "active" && !e.active) return false;
       if (show === "inactive" && e.active) return false;
       if (groupFilter !== "all" && e.group !== groupFilter) return false;
+      if (unitFilter !== "all" && e.unit !== unitFilter) return false;
+      if (categoryFilter !== "all" && e.category !== categoryFilter) return false;
       return (
         !q ||
-        [e.name, e.code, e.email, e.group, e.designation, e.phone].some((v) => (v || "").toLowerCase().includes(q))
+        [e.name, e.code, e.email, e.group, e.unit, e.category, e.designation, e.phone].some((v) => (v || "").toLowerCase().includes(q))
       );
     });
-  }, [employees, search, show, groupFilter]);
+  }, [employees, search, show, groupFilter, unitFilter, categoryFilter]);
 
   const run = async (fn, okText) => {
     try { await fn(); setNotice({ type: "ok", text: okText }); }
@@ -89,6 +96,18 @@ export default function ManageEmployees() {
             {groups.map((g) => <option key={g} value={g}>{g}</option>)}
           </select>
         </label>
+        <label className="field">Unit
+          <select value={unitFilter} onChange={(e) => setUnitFilter(e.target.value)}>
+            <option value="all">All units</option>
+            {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </label>
+        <label className="field">Category
+          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+            <option value="all">All categories</option>
+            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </label>
         <label className="field">Show
           <select value={show} onChange={(e) => setShow(e.target.value)}>
             <option value="all">All</option><option value="active">Active</option><option value="inactive">Inactive</option>
@@ -100,8 +119,8 @@ export default function ManageEmployees() {
         <table className="data">
           <thead>
             <tr>
-              <th>Employee ID</th><th>Name</th><th>Designation</th><th>Group</th><th>Phone</th><th>Email</th>
-              <th className="num">Gross ₹</th><th>EPF</th><th>ESI</th><th>Status</th><th>Actions</th>
+              <th>Employee ID</th><th>Name</th><th>Designation</th><th>Group</th><th>Unit</th><th>Category</th><th>Phone</th><th>Email</th>
+              <th className="num">Gross / Actual ₹</th><th className="num">Statutory ₹</th><th className="num">PT ₹</th><th>EPF</th><th>ESI</th><th>OT</th><th>Status</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -111,10 +130,15 @@ export default function ManageEmployees() {
                 <td><strong>{e.name}</strong></td>
                 <td>{dash(e.designation)}</td>
                 <td>{dash(e.group)}</td>
+                <td>{dash(e.unit)}</td>
+                <td>{dash(e.category)}</td>
                 <td>{dash(e.phone)}</td>
                 <td>{e.email}</td>
-                <td className="num">{inr(e.grossSalary)}</td>
+                <td className="num">{inr(isWorker(e) ? e.actualSalary ?? e.grossSalary : e.grossSalary)}</td>
+                <td className="num">{isWorker(e) ? inr(e.statutorySalary) : "—"}</td>
+                <td className="num">{isWorker(e) ? inr(e.professionalTax) : "—"}</td>
                 <td>{e.epf ? "Yes" : "No"}</td><td>{e.esi ? "Yes" : "No"}</td>
+                <td>{isWorker(e) ? (e.otApplicable === false ? "No" : "Yes") : "—"}</td>
                 <td><span className={`badge ${e.active ? "green" : "grey"}`}>{e.active ? "Active" : "Inactive"}</span></td>
                 <td>
                   <div className="toolbar" style={{ margin: 0 }}>
@@ -128,7 +152,7 @@ export default function ManageEmployees() {
                 </td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td colSpan={11} className="empty">No employees match. Try a different search or filter.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={16} className="empty">No employees match. Try a different search or filter.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -159,8 +183,19 @@ export default function ManageEmployees() {
               <Detail label="Employee ID" value={viewed.code} />
               <Detail label="Designation" value={viewed.designation} />
               <Detail label="Group" value={viewed.group} />
+              <Detail label="Unit" value={viewed.unit} />
+              <Detail label="Category" value={viewed.category} />
               <Detail label="Date of joining" value={fmtDate(viewed.doj)} />
-              <Detail label="Gross salary (₹ / month)" value={inr(viewed.grossSalary)} />
+              {isWorker(viewed) ? (
+                <>
+                  <Detail label="Actual salary (₹ / month)" value={inr(viewed.actualSalary ?? viewed.grossSalary)} />
+                  <Detail label="Statutory salary (₹ / month)" value={inr(viewed.statutorySalary)} />
+                  <Detail label="Professional tax (₹ / month)" value={inr(viewed.professionalTax)} />
+                  <Detail label="OT applicable" value={viewed.otApplicable === false ? "No" : "Yes"} />
+                </>
+              ) : (
+                <Detail label="Gross salary (₹ / month)" value={inr(viewed.grossSalary)} />
+              )}
               <Detail label="EPF applicable" value={viewed.epf ? "Yes" : "No"} />
               <Detail label="ESI applicable" value={viewed.esi ? "Yes" : "No"} />
             </Section>

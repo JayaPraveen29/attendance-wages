@@ -225,8 +225,8 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
         {/* Address, split into parts */}
         <label className="field">C/o<input value={f.co} onChange={set("co")}  /></label>
         <label className="field">H.No<input value={f.houseNo} onChange={set("houseNo")} /></label>
-        <label className="field">Village<input value={f.village} onChange={set("village")} /></label>
-        <label className="field">Mandal<input value={f.mandal} onChange={set("mandal")} /></label>
+        <label className="field">Village/town<input value={f.village} onChange={set("village")} /></label>
+        <label className="field">Mandal/Tahsil<input value={f.mandal} onChange={set("mandal")} /></label>
         <label className="field">District<input value={f.district} onChange={set("district")} /></label>
         <label className="field">State<input value={f.state} onChange={set("state")} /></label>
         <label className="field">Pin code
