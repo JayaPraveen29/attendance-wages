@@ -51,7 +51,7 @@ const todayStr = () => {
 const ADD_NEW = "__add_new_group__";
 
 export default function EmployeeForm({ initial, existing = [], exceptId, submitLabel, onSubmit, onCancel }) {
-  const [f, setF] = useState({ unit: "", category: "", branchName: "", actualSalary: "", statutorySalary: "", professionalTax: 0, otApplicable: true, ...EMPTY_EMPLOYEE, ...initial });
+  const [f, setF] = useState({ unit: "", category: "", branchName: "", postOffice: "", policeStation: "", actualSalary: "", statutorySalary: "", professionalTax: 0, otApplicable: true, ...EMPTY_EMPLOYEE, ...initial });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [addingGroup, setAddingGroup] = useState(false);
@@ -64,7 +64,6 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
 
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
 
-  // Pincode: digits only, max 6
   // Aadhar: digits only, max 12, shown as "1234 5678 9012" (space after every 4 digits)
   const fmtAadhar = (v) => String(v || "").replace(/\D/g, "").slice(0, 12).replace(/(\d{4})(?=\d)/g, "$1 ");
   const setAadhar = (e) => setF({ ...f, aadhar: fmtAadhar(e.target.value) });
@@ -72,6 +71,7 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
   // PAN: letters and digits only, always capital letters, max 10
   const setPan = (e) => setF({ ...f, pan: e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 10) });
 
+  // Pincode: digits only, max 6
   const setPincode = (e) => setF({ ...f, pincode: e.target.value.replace(/\D/g, "").slice(0, 6) });
 
   const submit = async (e) => {
@@ -175,7 +175,7 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
         <label className="field">Designation<input value={f.designation} onChange={set("designation")} /></label>
         <label className="field">Aadhar number<input value={fmtAadhar(f.aadhar)} onChange={setAadhar} inputMode="numeric" maxLength={14} /></label>
         <label className="field">PAN number<input value={(f.pan || "").toUpperCase()} onChange={setPan} maxLength={10} style={{ textTransform: "uppercase" }} /></label>
-        <label className="field">Email (optional)<input type="email" value={f.email} onChange={set("email")} /></label>
+        <label className="field">Email<input type="email" value={f.email} onChange={set("email")} /></label>
         <label className="field">Group
           <select value={addingGroup ? ADD_NEW : f.group} onChange={onGroupChange}>
             <option value="">Select group…</option>
@@ -233,6 +233,8 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
         <label className="field">C/o<input value={f.co} onChange={set("co")}  /></label>
         <label className="field">H.No<input value={f.houseNo} onChange={set("houseNo")} /></label>
         <label className="field">Village/Town<input value={f.village} onChange={set("village")} /></label>
+        <label className="field">Post Office<input value={f.postOffice} onChange={set("postOffice")} /></label>
+        <label className="field">Police station<input value={f.policeStation} onChange={set("policeStation")} /></label>
         <label className="field">Mandal/Tahsil<input value={f.mandal} onChange={set("mandal")} /></label>
         <label className="field">District<input value={f.district} onChange={set("district")} /></label>
         <label className="field">State<input value={f.state} onChange={set("state")} /></label>

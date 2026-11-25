@@ -58,7 +58,11 @@ export default function ManageEmployees() {
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return employees.filter((e) => {
+    return employees
+      .slice()
+      // sort by Employee ID in natural order: 1, 2, 3 ... 10 (not 1, 10, 2)
+      .sort((a, b) => String(a.code || "").localeCompare(String(b.code || ""), undefined, { numeric: true, sensitivity: "base" }))
+      .filter((e) => {
       if (show === "active" && !e.active) return false;
       if (show === "inactive" && e.active) return false;
       if (groupFilter !== "all" && e.group !== groupFilter) return false;
@@ -214,6 +218,8 @@ export default function ManageEmployees() {
               <Detail label="C/o" value={viewed.co} />
               <Detail label="H.No" value={viewed.houseNo} />
               <Detail label="Village/Town" value={viewed.village} />
+              <Detail label="Post Office" value={viewed.postOffice} />
+              <Detail label="Police station" value={viewed.policeStation} />
               <Detail label="Mandal/Tahsil" value={viewed.mandal} />
               <Detail label="District" value={viewed.district} />
               <Detail label="State" value={viewed.state} />
