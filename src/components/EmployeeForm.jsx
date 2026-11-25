@@ -52,7 +52,7 @@ const todayStr = () => {
 const ADD_NEW = "__add_new_group__";
 
 export default function EmployeeForm({ initial, existing = [], exceptId, submitLabel, onSubmit, onCancel }) {
-  const [f, setF] = useState({ unit: "", category: "", salaryType: "", professionalTax: 0, ...EMPTY_EMPLOYEE, ...initial });
+  const [f, setF] = useState({ unit: "", category: "", salaryType: "", professionalTax: 0, otApplicable: true, ...EMPTY_EMPLOYEE, ...initial });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [addingGroup, setAddingGroup] = useState(false);
@@ -61,6 +61,7 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
 
   const needsSalaryType = SALARY_TYPE_CATEGORIES.includes(f.category);
   const isStatutory = needsSalaryType && f.salaryType === "Statutory";
+  const isWorker = f.category === "Workers";
   const pt = isStatutory ? professionalTax(f.grossSalary) : 0;
 
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
@@ -86,6 +87,7 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
     data = {
       ...data,
       salaryType: SALARY_TYPE_CATEGORIES.includes(data.category) ? data.salaryType : "",
+      otApplicable: data.category === "Workers" ? data.otApplicable !== false : false,
       professionalTax: SALARY_TYPE_CATEGORIES.includes(data.category) && data.salaryType === "Statutory"
         ? professionalTax(data.grossSalary) : 0,
     };
@@ -235,6 +237,9 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
       <div className="form-checks">
         <label><input type="checkbox" checked={f.epf} onChange={set("epf")} /> EPF applicable</label>
         <label><input type="checkbox" checked={f.esi} onChange={set("esi")} /> ESI applicable</label>
+        {isWorker && (
+          <label><input type="checkbox" checked={f.otApplicable !== false} onChange={set("otApplicable")} /> OT applicable</label>
+        )}
       </div>
 
       <div className="toolbar">
