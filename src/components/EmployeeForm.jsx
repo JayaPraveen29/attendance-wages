@@ -6,6 +6,8 @@ import { EMPTY_EMPLOYEE, validateEmployee } from "../lib/employees";
 
 const GROUPS = ["SIEC", "ST", "IFPL", "Giri", "Kanchan", "Murali", "Bihar", "Others"];
 const GENDERS = ["Male", "Female"];
+const UNITS = ["Unit 1", "Unit 2"];
+const CATEGORIES = ["Directors", "Salaries", "Wages", "Casuals"];
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 // Age in whole years from a "YYYY-MM-DD" date of birth. Returns "" if DOB is empty/invalid.
@@ -27,7 +29,7 @@ const todayStr = () => {
 const ADD_NEW = "__add_new_group__";
 
 export default function EmployeeForm({ initial, existing = [], exceptId, submitLabel, onSubmit, onCancel }) {
-  const [f, setF] = useState({ ...EMPTY_EMPLOYEE, ...initial });
+  const [f, setF] = useState({ unit: "", category: "", ...EMPTY_EMPLOYEE, ...initial });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [addingGroup, setAddingGroup] = useState(false);
@@ -48,6 +50,8 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
       const match = groupOptions.find((g) => g.toLowerCase() === name.toLowerCase());
       data = { ...f, group: match || name };
     }
+    if (!data.unit) return setError("Select a unit (Unit 1 or Unit 2).");
+    if (!data.category) return setError("Select a category (Directors, Wages or Casuals).");
     const problem = validateEmployee(data, existing, exceptId);
     if (problem) return setError(problem);
     setError("");
@@ -122,6 +126,18 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
             <input value={newGroup} onChange={(e) => setNewGroup(e.target.value)}  autoFocus maxLength={40} />
           </label>
         )}
+        <label className="field">Unit *
+          <select value={f.unit} onChange={set("unit")}>
+            <option value="">Select unit…</option>
+            {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </label>
+        <label className="field">Category *
+          <select value={f.category} onChange={set("category")}>
+            <option value="">Select category…</option>
+            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </label>
         <label className="field">Gross salary (₹ / month) *<input type="number" min="0" step="0.01" value={f.grossSalary} onChange={set("grossSalary")} /></label>
         <label className="field">Phone<input value={f.phone} onChange={set("phone")} inputMode="tel" /></label>
 
