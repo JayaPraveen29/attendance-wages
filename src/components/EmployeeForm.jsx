@@ -7,7 +7,30 @@ import { EMPTY_EMPLOYEE, validateEmployee } from "../lib/employees";
 const GROUPS = ["SIEC", "ST", "IFPL", "Giri", "Kanchan", "Murali", "Bihar", "Others"];
 const GENDERS = ["Male", "Female"];
 const UNITS = ["Unit 1", "Unit 2"];
-const CATEGORIES = ["Directors", "Salaries", "Wages", "Casuals"];
+const CATEGORIES = ["Directors", "Admin Staff", "Field Staff", "Workers", "Casuals"];
+// Categories that must choose a salary type (Actual / Statutory).
+// Change this list if the category that needs it is called something else.
+const SALARY_TYPE_CATEGORIES = ["Workers"];
+const SALARY_TYPES = ["Actual salary", "Statutory"];
+
+// Professional tax slab (per month), applied to statutory salary only:
+//   below 15,000 -> 0 | 15,000 to 20,000 -> 150 | above 20,000 -> 200
+export function professionalTax(salary) {
+  const n = Number(salary) || 0;
+  if (n < 15000) return 0;
+  if (n <= 20000) return 150;
+  return 200;
+}
+
+// Groups the user chose to remove from the dropdown (kept in this browser).
+const HIDDEN_KEY = "hiddenGroups";
+const loadHidden = () => {
+  try { return JSON.parse(localStorage.getItem(HIDDEN_KEY)) || []; } catch { return []; }
+};
+const saveHidden = (list) => {
+  try { localStorage.setItem(HIDDEN_KEY, JSON.stringify(list)); } catch { /* ignore */ }
+};
+
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 // Age in whole years from a "YYYY-MM-DD" date of birth. Returns "" if DOB is empty/invalid.
@@ -29,11 +52,16 @@ const todayStr = () => {
 const ADD_NEW = "__add_new_group__";
 
 export default function EmployeeForm({ initial, existing = [], exceptId, submitLabel, onSubmit, onCancel }) {
-  const [f, setF] = useState({ unit: "", category: "", ...EMPTY_EMPLOYEE, ...initial });
+  const [f, setF] = useState({ unit: "", category: "", salaryType: "", professionalTax: 0, ...EMPTY_EMPLOYEE, ...initial });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [addingGroup, setAddingGroup] = useState(false);
   const [newGroup, setNewGroup] = useState("");
+  const [hiddenGroups, setHiddenGroups] = useState(loadHidden);
+
+  const needsSalaryType = SALARY_TYPE_CATEGORIES.includes(f.category);
+  const isStatutory = needsSalaryType && f.salaryType === "Statutory";
+  const pt = isStatutory ? professionalTax(f.grossSalary) : 0;
 
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
 
@@ -51,7 +79,16 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
       data = { ...f, group: match || name };
     }
     if (!data.unit) return setError("Select a unit (Unit 1 or Unit 2).");
-    if (!data.category) return setError("Select a category (Directors, Wages or Casuals).");
+    if (!data.category) return setError("Select a category (Directors, Admin Staff, Field Staff, Workers or Casuals).");
+    if (SALARY_TYPE_CATEGORIES.includes(data.category) && !data.salaryType) {
+      return setError("Select the salary type (Actual salary or Statutory).");
+    }
+    data = {
+      ...data,
+      salaryType: SALARY_TYPE_CATEGORIES.includes(data.category) ? data.salaryType : "",
+      professionalTax: SALARY_TYPE_CATEGORIES.includes(data.category) && data.salaryType === "Statutory"
+        ? professionalTax(data.grossSalary) : 0,
+    };
     const problem = validateEmployee(data, existing, exceptId);
     if (problem) return setError(problem);
     setError("");
@@ -72,8 +109,22 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
     [...existing.map((x) => x.group), f.group]
       .map((g) => (g || "").trim())
       .filter((g) => g && !GROUPS.some((d) => d.toLowerCase() === g.toLowerCase()))
+      // hidden (deleted) groups stay visible only if this employee currently has it
+      .filter((g) => !hiddenGroups.includes(g) || g === (initial?.group || "").trim())
   )].sort((a, b) => a.localeCompare(b));
   const groupOptions = [...GROUPS, ...customGroups];
+
+  const isCustomSelected = !addingGroup && f.group &&
+    !GROUPS.some((d) => d.toLowerCase() === f.group.toLowerCase());
+
+  const deleteSelectedGroup = () => {
+    if (!isCustomSelected) return;
+    if (!window.confirm(`Remove the group "${f.group}" from the dropdown?\nEmployees already in this group keep it.`)) return;
+    const next = [...new Set([...hiddenGroups, f.group])];
+    setHiddenGroups(next);
+    saveHidden(next);
+    setF({ ...f, group: "" });
+  };
 
   const onGroupChange = (e) => {
     if (e.target.value === ADD_NEW) {
@@ -113,7 +164,7 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
         <label className="field">Designation<input value={f.designation} onChange={set("designation")} /></label>
         <label className="field">Aadhar number<input value={f.aadhar} onChange={set("aadhar")} inputMode="numeric" maxLength={14} /></label>
         <label className="field">PAN number<input value={f.pan} onChange={set("pan")} maxLength={10} style={{ textTransform: "uppercase" }} /></label>
-        <label className="field">Email <input type="email" value={f.email} onChange={set("email")} /></label>
+        <label className="field">Email (optional)<input type="email" value={f.email} onChange={set("email")} /></label>
         <label className="field">Group
           <select value={addingGroup ? ADD_NEW : f.group} onChange={onGroupChange}>
             <option value="">Select group…</option>
@@ -121,6 +172,14 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
             <option value={ADD_NEW}>+ Add new group…</option>
           </select>
         </label>
+        {isCustomSelected && (
+          <div className="field">
+            <span>&nbsp;</span>
+            <button type="button" className="btn secondary" onClick={deleteSelectedGroup}>
+              Delete group “{f.group}”
+            </button>
+          </div>
+        )}
         {addingGroup && (
           <label className="field">New group name
             <input value={newGroup} onChange={(e) => setNewGroup(e.target.value)}  autoFocus maxLength={40} />
@@ -133,12 +192,28 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
           </select>
         </label>
         <label className="field">Category *
-          <select value={f.category} onChange={set("category")}>
+          <select
+            value={f.category}
+            onChange={(e) => setF({ ...f, category: e.target.value, salaryType: SALARY_TYPE_CATEGORIES.includes(e.target.value) ? f.salaryType : "" })}
+          >
             <option value="">Select category…</option>
             {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </label>
         <label className="field">Gross salary (₹ / month) *<input type="number" min="0" step="0.01" value={f.grossSalary} onChange={set("grossSalary")} /></label>
+        {needsSalaryType && (
+          <label className="field">Salary type *
+            <select value={f.salaryType} onChange={set("salaryType")}>
+              <option value="">Select salary type…</option>
+              {SALARY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </label>
+        )}
+        {isStatutory && (
+          <label className="field">Professional tax (₹ / month)
+            <input value={pt} readOnly tabIndex={-1} />
+          </label>
+        )}
         <label className="field">Phone<input value={f.phone} onChange={set("phone")} inputMode="tel" /></label>
 
         {/* Address, split into parts */}
@@ -149,7 +224,7 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
         <label className="field">District<input value={f.district} onChange={set("district")} /></label>
         <label className="field">State<input value={f.state} onChange={set("state")} /></label>
         <label className="field">Pin code
-          <input value={f.pincode} onChange={setPincode} inputMode="numeric" maxLength={6} />
+          <input value={f.pincode} onChange={setPincode} inputMode="numeric" maxLength={6} placeholder="6-digit pin code" />
         </label>
 
         <label className="field">Bank name<input value={f.bankName} onChange={set("bankName")} /></label>
