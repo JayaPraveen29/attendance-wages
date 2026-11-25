@@ -8,10 +8,9 @@ const GROUPS = ["SIEC", "ST", "IFPL", "Giri", "Kanchan", "Murali", "Bihar", "Oth
 const GENDERS = ["Male", "Female"];
 const UNITS = ["Unit 1", "Unit 2"];
 const CATEGORIES = ["Directors", "Admin Staff", "Field Staff", "Workers", "Casuals"];
-// Categories that must choose a salary type (Actual / Statutory).
-// Change this list if the category that needs it is called something else.
+// Categories that have two salaries (Actual and Statutory) instead of one gross salary.
+// Change this list if the category is called something else.
 const SALARY_TYPE_CATEGORIES = ["Workers"];
-const SALARY_TYPES = ["Actual salary", "Statutory"];
 
 // Professional tax slab (per month), applied to statutory salary only:
 //   below 15,000 -> 0 | 15,000 to 20,000 -> 150 | above 20,000 -> 200
@@ -52,7 +51,7 @@ const todayStr = () => {
 const ADD_NEW = "__add_new_group__";
 
 export default function EmployeeForm({ initial, existing = [], exceptId, submitLabel, onSubmit, onCancel }) {
-  const [f, setF] = useState({ unit: "", category: "", salaryType: "", professionalTax: 0, otApplicable: true, ...EMPTY_EMPLOYEE, ...initial });
+  const [f, setF] = useState({ unit: "", category: "", actualSalary: "", statutorySalary: "", professionalTax: 0, otApplicable: true, ...EMPTY_EMPLOYEE, ...initial });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [addingGroup, setAddingGroup] = useState(false);
@@ -60,9 +59,8 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
   const [hiddenGroups, setHiddenGroups] = useState(loadHidden);
 
   const needsSalaryType = SALARY_TYPE_CATEGORIES.includes(f.category);
-  const isStatutory = needsSalaryType && f.salaryType === "Statutory";
   const isWorker = f.category === "Workers";
-  const pt = isStatutory ? professionalTax(f.grossSalary) : 0;
+  const pt = needsSalaryType ? professionalTax(f.statutorySalary) : 0;
 
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
 
@@ -81,16 +79,20 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
     }
     if (!data.unit) return setError("Select a unit (Unit 1 or Unit 2).");
     if (!data.category) return setError("Select a category (Directors, Admin Staff, Field Staff, Workers or Casuals).");
-    if (SALARY_TYPE_CATEGORIES.includes(data.category) && !data.salaryType) {
-      return setError("Select the salary type (Actual salary or Statutory).");
+    if (SALARY_TYPE_CATEGORIES.includes(data.category)) {
+      if (!(Number(data.actualSalary) > 0)) return setError("Enter the actual salary.");
+      if (!(Number(data.statutorySalary) > 0)) return setError("Enter the statutory salary.");
+      data = {
+        ...data,
+        actualSalary: Number(data.actualSalary),
+        statutorySalary: Number(data.statutorySalary),
+        grossSalary: Number(data.actualSalary), // keeps existing payroll screens working
+        professionalTax: professionalTax(data.statutorySalary),
+      };
+    } else {
+      data = { ...data, actualSalary: "", statutorySalary: "", professionalTax: 0 };
     }
-    data = {
-      ...data,
-      salaryType: SALARY_TYPE_CATEGORIES.includes(data.category) ? data.salaryType : "",
-      otApplicable: data.category === "Workers" ? data.otApplicable !== false : false,
-      professionalTax: SALARY_TYPE_CATEGORIES.includes(data.category) && data.salaryType === "Statutory"
-        ? professionalTax(data.grossSalary) : 0,
-    };
+    data = { ...data, otApplicable: data.category === "Workers" ? data.otApplicable !== false : false };
     const problem = validateEmployee(data, existing, exceptId);
     if (problem) return setError(problem);
     setError("");
@@ -196,25 +198,27 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
         <label className="field">Category *
           <select
             value={f.category}
-            onChange={(e) => setF({ ...f, category: e.target.value, salaryType: SALARY_TYPE_CATEGORIES.includes(e.target.value) ? f.salaryType : "" })}
+            onChange={(e) => setF({ ...f, category: e.target.value, })}
           >
             <option value="">Select category…</option>
             {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </label>
-        <label className="field">Gross salary (₹ / month) *<input type="number" min="0" step="0.01" value={f.grossSalary} onChange={set("grossSalary")} /></label>
-        {needsSalaryType && (
-          <label className="field">Salary type *
-            <select value={f.salaryType} onChange={set("salaryType")}>
-              <option value="">Select salary type…</option>
-              {SALARY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </label>
+        {!needsSalaryType && (
+          <label className="field">Gross salary (₹ / month) *<input type="number" min="0" step="0.01" value={f.grossSalary} onChange={set("grossSalary")} /></label>
         )}
-        {isStatutory && (
-          <label className="field">Professional tax (₹ / month)
-            <input value={pt} readOnly tabIndex={-1} />
-          </label>
+        {needsSalaryType && (
+          <>
+            <label className="field">Actual salary (₹ / month) *
+              <input type="number" min="0" step="0.01" value={f.actualSalary} onChange={set("actualSalary")} />
+            </label>
+            <label className="field">Statutory salary (₹ / month) *
+              <input type="number" min="0" step="0.01" value={f.statutorySalary} onChange={set("statutorySalary")} />
+            </label>
+            <label className="field">Professional tax (₹ / month)
+              <input value={pt} readOnly tabIndex={-1} />
+            </label>
+          </>
         )}
         <label className="field">Phone<input value={f.phone} onChange={set("phone")} inputMode="tel" /></label>
 
