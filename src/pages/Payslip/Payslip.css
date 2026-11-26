@@ -1,0 +1,20 @@
+.slip { max-width: 640px; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 28px; }
+.slip h2 { margin: 0 0 2px; font-size: 20px; color: var(--navy); }
+.slip .slip-month { color: var(--text-muted); margin-bottom: 16px; }
+.slip-info { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; margin-bottom: 18px; font-size: 14.5px; }
+.slip-info span { color: var(--text-muted); }
+.slip-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.slip table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+.slip th { text-align: left; padding: 6px 0; border-bottom: 2px solid var(--border); font-size: 13px; color: var(--text-muted); }
+.slip td { padding: 6px 0; border-bottom: 1px solid var(--border); }
+.slip td.amt, .slip th.amt { text-align: right; }
+.slip tfoot td { font-weight: 700; border-bottom: none; padding-top: 8px; }
+.slip-net { margin-top: 18px; padding: 12px 14px; background: #eef5f1; border-radius: var(--radius); display: flex; justify-content: space-between; font-size: 17px; font-weight: 700; }
+@media (max-width: 560px) { .slip-cols, .slip-info { grid-template-columns: 1fr; } }
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+  .sidebar, .mobile-header, .mobile-drawer, .mobile-menu-overlay, .no-print { display: none !important; }
+  body { background: #fff; }
+  .page { padding: 0; }
+  .slip { border: 1px solid #999; max-width: none; }
+}

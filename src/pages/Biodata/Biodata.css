@@ -1,0 +1,15 @@
+.bio { max-width: 900px; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 28px; }
+.bio h2 { margin: 0; font-size: 22px; color: var(--navy); }
+.bio .bio-sub { color: var(--text-muted); margin: 2px 0 18px; }
+.bio section { margin-bottom: 20px; }
+.bio h3 { margin: 0 0 10px; font-size: 15px; color: var(--navy); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.bio-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px 20px; }
+.bio-label { font-size: 12.5px; color: var(--text-muted); margin-bottom: 2px; }
+.bio-value { font-size: 15px; font-weight: 600; word-break: break-word; }
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+  .sidebar, .mobile-header, .mobile-drawer, .mobile-menu-overlay, .no-print { display: none !important; }
+  body { background: #fff; }
+  .page { padding: 0; }
+  .bio { border: none; padding: 0; max-width: none; }
+}

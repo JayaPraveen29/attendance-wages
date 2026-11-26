@@ -9,6 +9,8 @@ import Attendance from "./pages/Attendance/Attendance";
 import CreateEmployee from "./pages/CreateEmployee/CreateEmployee";
 import ManageEmployees from "./pages/ManageEmployees/ManageEmployees";
 import Salaries from "./pages/Salaries/Salaries";
+import Payslip from "./pages/Payslip/Payslip";
+import Biodata from "./pages/Biodata/Biodata";
 import Approvals from "./pages/Approvals/Approvals";
 import { homePath, canManageEmployees, canUseSalaries, canApprove } from "./lib/permissions";
 
@@ -51,6 +53,8 @@ function AppRoutes() {
       {page("/employees/new", CreateEmployee, canManageEmployees)}
       {page("/employees", ManageEmployees, canManageEmployees)}
       {page("/salaries", Salaries, canUseSalaries)}
+      {page("/payslip", Payslip, canUseSalaries)}
+      {page("/biodata", Biodata, canManageEmployees)}
       {page("/approvals", Approvals, canApprove)}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

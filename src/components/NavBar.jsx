@@ -16,6 +16,8 @@ const ICONS = {
   create: <path d="M15 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm9-2v6m3-3h-6" />,
   employees: <path d="M17 20v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1m8-9a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm13 9v-1a4 4 0 0 0-3-3.9M16 4.1a3.5 3.5 0 0 1 0 6.8" />,
   salaries: <path d="M6 4h12M6 9h12M9 4c5 0 6 5 0 5l7 8M4 4h0" />,
+  payslip: <path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6" />,
+  biodata: <path d="M4 4h16v16H4zM9 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm-3 6c0-2 1.5-3 3-3s3 1 3 3M14 8h4M14 12h4" />,
   approvals: <path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6zm-3 9 2.2 2.2L15.5 10" />,
 };
 const Icon = ({ name }) => (
@@ -35,6 +37,8 @@ export default function NavBar() {
     { to: "/employees/new", label: "Create employee", icon: "create", show: canManageEmployees(profile) },
     { to: "/employees", label: "Manage employees", icon: "employees", show: canManageEmployees(profile), end: true },
     { to: "/salaries", label: "Salaries", icon: "salaries", show: canUseSalaries(profile) },
+    { to: "/payslip", label: "Payslip", icon: "payslip", show: canUseSalaries(profile) },
+    { to: "/biodata", label: "Biodata", icon: "biodata", show: canManageEmployees(profile) },
     { to: "/approvals", label: "Approvals", icon: "approvals", show: canApprove(profile) },
   ].filter((l) => l.show);
 
