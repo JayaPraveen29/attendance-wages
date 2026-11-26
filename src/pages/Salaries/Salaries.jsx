@@ -155,9 +155,9 @@ export default function Salaries() {
     return employees
       .filter((e) => e.category === "Workers") // Actual and Paysheet reports are for Workers only
       .filter((e) => e.active || (counts[e.id] && Object.values(counts[e.id]).some(Boolean)))
-      .map((e) => computeRow({ employee: e, month, counts: counts[e.id], workingDays, entry: { ...(entries[e.id] || {}), ...(drafts[e.id] || {}), otHours: otByEmp[e.id] || 0 } }))
+      .map((e) => computeRow({ employee: e, month, counts: counts[e.id], workingDays, payDays: actualDays, entry: { ...(entries[e.id] || {}), ...(drafts[e.id] || {}), otHours: otByEmp[e.id] || 0 } }))
       .sort(byCode);
-  }, [employees, counts, otByEmp, entries, drafts, workingDays, finalized, payroll, month]);
+  }, [employees, counts, otByEmp, entries, drafts, workingDays, actualDays, finalized, payroll, month]);
 
   const total = (k) => sumRows(rows, k);
 

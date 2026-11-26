@@ -31,8 +31,8 @@ import { db } from "../firebase";
 //     Cash                 = Total - Bank gross - EPF - ESI - Adv, rounded to nearest 10
 export const DEFAULT_WORKING_DAYS = 26;
 
-// Salary and OT are always calculated on a 30-day month (paysheet rule).
-// Working days is only used for LP (loss of pay days).
+// Salary and OT are divided by the "Days in month" box of the Actual report (30 if none is given).
+// Working days is used for the paysheet per-day rate and LP.
 export const PAY_DIVISOR = 30;
 export const OT_HOURS_PER_DAY = 8;
 const roundTo10 = (n) => Math.round(n / 10) * 10;
@@ -66,23 +66,25 @@ export const ptForSalary = (gross) => PT_SLABS.find((s) => gross <= s.upTo).pt;
 const r2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 const num = (v) => (v === "" || v == null || isNaN(Number(v)) ? 0 : Number(v));
 
-export function computeRow({ employee, counts, workingDays, entry, month }) {
+// payDays = the "Days in month" box of the Actual report: the divisor for salary and OT (defaults to 30).
+export function computeRow({ employee, counts, workingDays, payDays, entry, month }) {
   const c = counts || { Present: 0, "Half day": 0, Leave: 0, Absent: 0 };
   const e = entry || {};
   // gross = Actual Salary (shown as is). paysheetSalary = Paysheet salary, which only PT is calculated on (earned salary and OT use gross / Actual Salary).
   const gross = num(employee.actualSalary) > 0 ? num(employee.actualSalary) : num(employee.grossSalary);
   const paysheetSalary = num(employee.statutorySalary) > 0 ? num(employee.statutorySalary) : gross;
   const wd = Math.max(1, num(workingDays));
+  const divisor = Math.max(1, num(payDays) || PAY_DIVISOR);   // days the salary is divided by
 
   const p = c.Present + 0.5 * c["Half day"];                 // P
   const l = c.Leave;                                         // L
   const lp = Math.max(0, wd - p - l);                        // LP
-  const paidDays = Math.min(wd, p + (LEAVE_IS_PAID ? l : 0)); // Paid
+  const paidDays = p + (LEAVE_IS_PAID ? l : 0);              // Paid (not capped: salary is per day on a 30-day month)
 
   // Salary payable, whole rupees (same order of operations as the sheet: Gross / days * paid)
-  const earned = Math.round((gross / PAY_DIVISOR) * paidDays);   // Salary payable, on Actual Salary
+  const earned = Math.round((gross / divisor) * paidDays);   // Salary payable, on Actual Salary
   const otHours = num(e.otHours);
-  const otAmt = Math.round((gross / PAY_DIVISOR / OT_HOURS_PER_DAY) * otHours); // OT is on Actual Salary
+  const otAmt = Math.round((gross / divisor / OT_HOURS_PER_DAY) * otHours); // OT is on Actual Salary
   const hra = 0; // HRA column removed from the sheet
 
   const ptOverridden = e.pt !== "" && e.pt != null;
