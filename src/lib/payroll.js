@@ -20,15 +20,16 @@ import { db } from "../firebase";
 //   OT amount              = ROUND(Actual salary / 30 / 8 * OT hours, 0)
 //   Total                  = Salary payable + OT, rounded to nearest 10
 //   PT                     = by Paysheet salary slab (editable per row)
-//   EPF                    = 12% of Salary payable (Bank gross), only if Paysheet salary is 25,000 or less
+//   EPF                    = 12% of Salary payable (Bank gross), if Paysheet salary is 25,000 or less,
+//                            or if "EPF applicable" is ticked on the employee (even above 25,000)
 //   ESI                    = 0.75% of Salary payable (Bank gross), only if Paysheet salary is 21,000 or less
 //
 //   Bank / Cash split:
 //     Paysheet per day     = Paysheet salary / working days
 //     Bank days            = Total / Paysheet per day, rounded DOWN to the nearest 0.5
 //     Bank gross           = ROUND(Paysheet per day * Bank days, 0)
-//     Bank                 = Bank gross - PT
-//     Cash                 = Total - Bank gross - EPF - ESI - Adv, rounded to nearest 10
+//     Bank                 = Bank gross - PT - EPF - ESI
+//     Cash                 = Total - Bank gross - Adv, rounded to nearest 10
 export const DEFAULT_WORKING_DAYS = 26;
 
 // Salary and OT are divided by the "Days in month" box of the Actual report (30 if none is given).
@@ -98,10 +99,11 @@ export function computeRow({ employee, counts, workingDays, payDays, entry, mont
   const bankDays = perDay > 0 ? Math.floor((totalEarnings / perDay) * 2 + 1e-9) / 2 : 0; // down to nearest 0.5
   const bankGross = Math.round(perDay * bankDays);
   // EPF / ESI are worked out on Salary payable (= Bank gross), depending on the Paysheet salary
-  const epf = paysheetSalary <= EPF_PAYSHEET_LIMIT ? Math.round(bankGross * EPF_RATE) : 0;
+  const epfApplies = paysheetSalary <= EPF_PAYSHEET_LIMIT || employee.epf === true;
+  const epf = epfApplies ? Math.round(bankGross * EPF_RATE) : 0;
   const esi = paysheetSalary <= ESI_PAYSHEET_LIMIT ? Math.round(bankGross * ESI_RATE) : 0;
-  const bank = r2(bankGross - pt);                            // Bank = Bank gross - PT
-  const cash = roundTo10(totalEarnings - bankGross - epf - esi - advance); // Cash = Total - Bank gross - EPF - ESI - Adv, nearest 10
+  const bank = r2(bankGross - pt - epf - esi);                // Bank = Bank gross - PT - EPF - ESI
+  const cash = roundTo10(totalEarnings - bankGross - advance); // Cash = Total - Bank gross - Adv, nearest 10 (EPF / ESI already come off the bank amount)
 
   const totalDeductions = r2(advance + epf + esi + pt);      // Total deductions
 

@@ -28,7 +28,7 @@ export const EMPTY_EMPLOYEE = {
   gender: "", bloodGroup: "", dob: "", doj: "", designation: "",
   aadhar: "", pan: "",
   address: "", co: "", houseNo: "", village: "", mandal: "", district: "", state: "", pincode: "",
-  epf: true, esi: false,
+  epf: false, esi: false, // EPF applicable is ticked by hand (it forces EPF even above the 25,000 paysheet limit)
   bankName: "", branchName: "", accountNumber: "", ifsc: "", phone: "", residencePhone: "",
 };
 
