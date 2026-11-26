@@ -1,5 +1,5 @@
 // Month grid: one row per employee, one column per day (P / H / L / A).
-// Totals: P counts a half day as 0.5 (2 H = 1 P), then L, A and OT hours (workers).
+// Totals: P counts a half day as 0.5 (2 H = 1 P), then L, A and OT hours (workers and casuals).
 import { useEffect, useMemo, useState } from "react";
 import { listenAttendanceDetails, STATUS_SHORT } from "../../lib/attendance";
 import { thisMonth, datesOfMonth, monthLabel } from "../../lib/dates";
@@ -71,7 +71,7 @@ export default function MonthGrid({ employees }) {
                   <td className="num">{num(t.present)}</td>
                   <td className="num">{t.leave}</td>
                   <td className="num">{t.absent}</td>
-                  <td className="num">{e.category === "Workers" ? num(t.ot) : "—"}</td>
+                  <td className="num">{e.category === "Workers" || e.category === "Casuals" ? num(t.ot) : "—"}</td>
                 </tr>
               );
             })}

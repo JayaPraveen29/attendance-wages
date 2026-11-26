@@ -1,5 +1,5 @@
 // Day view: pick a date (or a From–To range), tap a status for each active employee.
-// Workers also get an OT (hours) box. With a range, the status / OT you set is applied to every day in it.
+// Workers and Casuals also get an OT (hours) box. With a range, the status / OT you set is applied to every day in it.
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { listenAttendanceDetails, setAttendance, setOvertime, STATUSES } from "../../lib/attendance";
@@ -20,7 +20,7 @@ function datesBetween(from, to) {
   return out;
 }
 
-const isWorker = (e) => e.category === "Workers";
+const isWorker = (e) => e.category === "Workers" || e.category === "Casuals"; // gets an OT box
 
 export default function DayView({ employees }) {
   const { profile } = useAuth();

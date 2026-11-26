@@ -61,9 +61,16 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
 
   const needsSalaryType = SALARY_TYPE_CATEGORIES.includes(f.category);
   const isWorker = f.category === "Workers";
+  const isCasual = f.category === "Casuals";
   const pt = needsSalaryType ? professionalTax(f.statutorySalary) : 0;
 
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
+
+  // Casuals: monthly salary OR day salary - typing in one clears the other
+  const setCasualSalary = (key) => (e) => {
+    const other = key === "monthlySalary" ? "daySalary" : "monthlySalary";
+    setF({ ...f, [key]: e.target.value, [other]: "" });
+  };
 
   // Aadhar: digits only, max 12, shown as "1234 5678 9012" (space after every 4 digits)
   const fmtAadhar = (v) => String(v || "").replace(/\D/g, "").slice(0, 12).replace(/(\d{4})(?=\d)/g, "$1 ");
@@ -99,8 +106,21 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
         grossSalary: Number(data.actualSalary), // keeps existing payroll screens working
         professionalTax: professionalTax(data.statutorySalary),
       };
+    } else if (data.category === "Casuals") {
+      const monthly = Number(data.monthlySalary) || 0;
+      const day = Number(data.daySalary) || 0;
+      if (monthly > 0 && day > 0) return setError("Enter either the monthly salary or the day salary, not both.");
+      if (!(monthly > 0) && !(day > 0)) return setError("Enter the monthly salary or the day salary.");
+      data = {
+        ...data,
+        monthlySalary: monthly,
+        daySalary: day,
+        // keeps existing payroll screens working: a day salary counts as 30 days
+        grossSalary: monthly > 0 ? monthly : day * 30,
+        actualSalary: "", statutorySalary: "", professionalTax: 0,
+      };
     } else {
-      data = { ...data, actualSalary: "", statutorySalary: "", professionalTax: 0 };
+      data = { ...data, actualSalary: "", statutorySalary: "", professionalTax: 0, monthlySalary: 0, daySalary: 0 };
     }
     data = { ...data, otApplicable: data.category === "Workers" ? data.otApplicable !== false : false };
     const problem = validateEmployee(data, existing, exceptId);
@@ -222,8 +242,18 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
           </select>
         </label>
         <label className="field">Designation<input value={f.designation} onChange={set("designation")} /></label>
-        {!needsSalaryType && (
+        {!needsSalaryType && !isCasual && (
           <label className="field">Salary (₹ / month) *<input type="number" min="0" step="0.01" value={f.grossSalary} onChange={set("grossSalary")} /></label>
+        )}
+        {isCasual && (
+          <>
+            <label className="field">Monthly salary (₹ / month)
+              <input type="number" min="0" step="0.01" value={f.monthlySalary || ""} onChange={setCasualSalary("monthlySalary")} />
+            </label>
+            <label className="field">Day salary (₹ / day)
+              <input type="number" min="0" step="0.01" value={f.daySalary || ""} onChange={setCasualSalary("daySalary")} />
+            </label>
+          </>
         )}
         {needsSalaryType && (
           <>
@@ -239,6 +269,7 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
           </>
         )}
         <label className="field">Phone<input value={f.phone} onChange={set("phone")} inputMode="tel" /></label>
+        <label className="field">Residency phone number<input value={f.residencePhone || ""} onChange={set("residencePhone")} inputMode="tel" /></label>
 
         {/* Address, split into parts */}
         <label className="field">C/o<input value={f.co} onChange={set("co")}  /></label>

@@ -3,6 +3,7 @@
 //   employees/{id} {
 //     name, code, email, group, unit, category, grossSalary,
 //     actualSalary, statutorySalary, professionalTax, otApplicable (Workers),
+//     monthlySalary / daySalary (Casuals: only one of the two is filled),
 //     gender, bloodGroup, dob, doj, designation, aadhar, pan,
 //     address, pincode,
 //     epf (bool), esi (bool),                 // is EPF / ESI deducted for this person
@@ -23,11 +24,12 @@ export const EMPTY_EMPLOYEE = {
   name: "", code: "", email: "", group: "", grossSalary: "",
   unit: "", category: "",
   actualSalary: "", statutorySalary: "", professionalTax: 0, otApplicable: true,
+  monthlySalary: "", daySalary: "",
   gender: "", bloodGroup: "", dob: "", doj: "", designation: "",
   aadhar: "", pan: "",
   address: "", co: "", houseNo: "", village: "", mandal: "", district: "", state: "", pincode: "",
   epf: true, esi: false,
-  bankName: "", branchName: "", accountNumber: "", ifsc: "", phone: "",
+  bankName: "", branchName: "", accountNumber: "", ifsc: "", phone: "", residencePhone: "",
 };
 
 const s = (v) => (v == null ? "" : String(v)).trim();
@@ -44,6 +46,8 @@ function clean(f) {
     actualSalary: Number(f.actualSalary) || 0,
     statutorySalary: Number(f.statutorySalary) || 0,
     professionalTax: Number(f.professionalTax) || 0,
+    monthlySalary: Number(f.monthlySalary) || 0,
+    daySalary: Number(f.daySalary) || 0,
     otApplicable: f.otApplicable !== false,
     gender: s(f.gender),
     bloodGroup: s(f.bloodGroup),
@@ -67,6 +71,7 @@ function clean(f) {
     accountNumber: s(f.accountNumber),
     ifsc: s(f.ifsc).toUpperCase(),
     phone: s(f.phone),
+    residencePhone: s(f.residencePhone),
   };
 }
 
@@ -77,6 +82,7 @@ export function validateEmployee(f, list, exceptId = null) {
   if (s(f.email) && !/^\S+@\S+\.\S+$/.test(s(f.email))) return "Email looks wrong.";
   if (!(Number(f.grossSalary) > 0)) return "Salary must be greater than 0.";
   if (s(f.phone) && !/^\+?[0-9 -]{7,15}$/.test(s(f.phone))) return "Phone number looks wrong.";
+  if (s(f.residencePhone) && !/^\+?[0-9 -]{7,15}$/.test(s(f.residencePhone))) return "Residency phone number looks wrong.";
   if (s(f.pincode) && !/^[1-9][0-9]{5}$/.test(s(f.pincode))) return "Pincode must be a valid 6-digit number.";
   const code = s(f.code).toUpperCase();
   if (list.some((e) => e.id !== exceptId && (e.code || "").toUpperCase() === code)) {

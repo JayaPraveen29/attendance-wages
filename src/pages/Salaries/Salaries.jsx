@@ -6,7 +6,7 @@ import { useAuth } from "../../context/AuthContext";
 import { listenEmployees } from "../../lib/employees";
 import { listenAttendanceDetails, countsByEmployee } from "../../lib/attendance";
 import {
-  DEFAULT_WORKING_DAYS, computeRow, sumRows,
+  DEFAULT_WORKING_DAYS, PAY_DIVISOR, OT_HOURS_PER_DAY, computeRow, sumRows,
   listenPayrollMonth, listenEntries, saveEntry, savePayrollMonth, finalizeMonth, reopenMonth,
 } from "../../lib/payroll";
 import { thisMonth, datesOfMonth, daysInMonth, monthLabel } from "../../lib/dates";
@@ -51,6 +51,18 @@ const CSV_COLUMNS = (days) => [
   { header: "Bank Name", value: (r) => r.bankName },
   { header: "Account number", value: (r) => r.accountNumber },
   { header: "IFSC", value: (r) => r.ifsc },
+];
+
+// Casuals paysheet: S.No, Name, Rate, Days, OT, D.Amt, OT Amt, Total
+const CASUAL_CSV_COLUMNS = [
+  { header: "S.No", value: (r) => r.sno },
+  { header: "Name", value: (r) => r.name },
+  { header: "Rate", value: (r) => r.rate },
+  { header: "Days", value: (r) => r.days },
+  { header: "OT", value: (r) => r.ot },
+  { header: "D.Amt", value: (r) => r.dAmt },
+  { header: "OT Amt", value: (r) => r.otAmt },
+  { header: "Total", value: (r) => r.total },
 ];
 
 const PAYSHEET_CSV_COLUMNS = (wd) => [
@@ -106,6 +118,7 @@ export default function Salaries() {
   const workingDays = payroll?.paysheetDays ?? DEFAULT_WORKING_DAYS;
   const actualDays = payroll?.actualDays ?? monthDays;
   const isActual = report === "actual";
+  const isCasuals = report === "casuals";
   const shownDays = isActual ? actualDays : workingDays;
   // attMap: `${employeeId}_${date}` -> { status, ot }
   const counts = useMemo(() => {
@@ -135,6 +148,32 @@ export default function Salaries() {
   }, [employees, counts, otByEmp, entries, drafts, workingDays, finalized, payroll, month]);
 
   const total = (k) => sumRows(rows, k);
+
+  // ---- Casuals paysheet ----
+  //   Rate   = what was entered on the employee: the day salary, or the monthly salary
+  //   Days   = Present (a half day counts as 0.5); Leave and Holiday are not counted
+  //   OT     = OT hours: typed here (double-click), otherwise the OT hours from Attendance
+  //   D.Amt  = day rate x Days        OT Amt = day rate / 8 x OT      Total = D.Amt + OT Amt
+  //            (day rate = Rate, or Rate / 30 when the Rate is a monthly salary)
+  const casualRows = useMemo(() => (
+    employees
+      .filter((e) => e.category === "Casuals" && (e.active || (counts[e.id] && Object.values(counts[e.id]).some(Boolean))))
+      .sort(byCode)
+      .map((e, i) => {
+        const c = counts[e.id] || { Present: 0, "Half day": 0, Leave: 0, Absent: 0 };
+        const m = { ...(entries[e.id] || {}), ...(drafts[e.id] || {}) };
+        const isDaily = Number(e.daySalary) > 0;
+        const rate = isDaily ? Number(e.daySalary) : (Number(e.monthlySalary) > 0 ? Number(e.monthlySalary) : Number(e.grossSalary) || 0);
+        // amounts are worked out per day: a monthly rate is divided by 30
+        const dayRate = isDaily ? rate : rate / PAY_DIVISOR;
+        const days = c.Present + 0.5 * c["Half day"];
+        const ot = m.casualOt !== undefined && m.casualOt !== "" ? Number(m.casualOt) || 0 : (otByEmp[e.id] || 0);
+        const dAmt = Math.round(dayRate * days);
+        const otAmt = Math.round((dayRate / OT_HOURS_PER_DAY) * ot);
+        return { employeeId: e.id, sno: i + 1, name: e.name, rate, days, ot, dAmt, otAmt, total: dAmt + otAmt };
+      })
+  ), [employees, counts, otByEmp, entries, drafts]);
+  const casualTotal = (k) => sumRows(casualRows, k);
 
   // ---- editing ----
   const setDraft = (id, k, v) => setDrafts((d) => ({ ...d, [id]: { ...(d[id] || {}), [k]: v } }));
@@ -172,9 +211,30 @@ export default function Salaries() {
   };
 
   const exportCsv = () => downloadCsv(
-    `${report === "actual" ? "salaries" : "paysheet"}-${month}.csv`,
-    toCsv(rows, report === "actual" ? CSV_COLUMNS(actualDays) : PAYSHEET_CSV_COLUMNS(workingDays)),
+    `${isCasuals ? "casuals-paysheet" : report === "actual" ? "salaries" : "paysheet"}-${month}.csv`,
+    isCasuals ? toCsv(casualRows, CASUAL_CSV_COLUMNS)
+      : toCsv(rows, report === "actual" ? CSV_COLUMNS(actualDays) : PAYSHEET_CSV_COLUMNS(workingDays)),
   );
+
+  // Casuals OT cell: double-click to edit
+  const casualOtCell = (r) => {
+    if (editCell && editCell.id === r.employeeId && editCell.k === "casualOt") {
+      return (
+        <input
+          className="cell-input" type="number" min="0" step="0.5" autoFocus placeholder="0"
+          value={drafts[r.employeeId]?.casualOt ?? r.ot}
+          onChange={(e) => setDraft(r.employeeId, "casualOt", e.target.value)}
+          onBlur={() => { commit(r.employeeId, "casualOt"); setEditCell(null); }}
+          onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+        />
+      );
+    }
+    return (
+      <span className="adv-cell" title="Double-click to edit" onDoubleClick={() => setEditCell({ id: r.employeeId, k: "casualOt" })}>
+        {inr(r.ot)}
+      </span>
+    );
+  };
 
   const cellInput = (r, k, placeholder) => {
     if (finalized) return inr(r[k]);
@@ -223,30 +283,33 @@ export default function Salaries() {
           <select value={report} onChange={(e) => { setReport(e.target.value); setWdDraft(null); }}>
             <option value="actual">Actual salary report</option>
             <option value="paysheet">Paysheet salary report</option>
+            <option value="casuals">Casuals paysheet</option>
           </select>
         </label>
-        <label className="field">{isActual ? "Days in month" : "Working days"}
-          <input type="number" min="1" max="31" style={{ width: 100 }} disabled={finalized}
-            value={wdDraft ?? shownDays}
-            onChange={(e) => setWdDraft(e.target.value)} onBlur={commitWorkingDays} />
-        </label>
-        {finalized
+        {!isCasuals && (
+          <label className="field">{isActual ? "Days in month" : "Working days"}
+            <input type="number" min="1" max="31" style={{ width: 100 }} disabled={finalized}
+              value={wdDraft ?? shownDays}
+              onChange={(e) => setWdDraft(e.target.value)} onBlur={commitWorkingDays} />
+          </label>
+        )}
+        {!isCasuals && (finalized
           ? <button className="btn secondary" onClick={reopen}>Edit finalized month</button>
-          : <button className="btn" onClick={finalize} disabled={!rows.length}>Finalize month</button>}
-        <button className="btn secondary" onClick={() => window.print()} disabled={!rows.length}>Print paysheet</button>
-        <button className="btn secondary" onClick={exportCsv} disabled={!rows.length}>Export CSV</button>
+          : <button className="btn" onClick={finalize} disabled={!rows.length}>Finalize month</button>)}
+        <button className="btn secondary" onClick={() => window.print()} disabled={!(isCasuals ? casualRows : rows).length}>Print paysheet</button>
+        <button className="btn secondary" onClick={exportCsv} disabled={!(isCasuals ? casualRows : rows).length}>Export CSV</button>
       </div>
 
-      {finalized && (
+      {!isCasuals && finalized && (
         <div className="msg warn no-print">
           Finalized{payroll.finalizedBy ? ` by ${payroll.finalizedBy}` : ""}. Figures are frozen; use “Edit finalized month” to change them.
         </div>
       )}
-      {!finalized && payroll?.editedAfterFinalize && (
+      {!isCasuals && !finalized && payroll?.editedAfterFinalize && (
         <div className="msg warn no-print">This month was finalized earlier and reopened by {payroll.reopenedBy || "someone"}. Finalize again when done.</div>
       )}
 
-      {rows.length > 0 && (
+      {!isCasuals && rows.length > 0 && (
         <div className="stats no-print">
           <div className="stat"><div className="label">Employees</div><div className="value">{rows.length}</div></div>
           <div className="stat"><div className="label">Total earnings</div><div className="value">₹{inr(total("totalEarnings"))}</div></div>
@@ -255,9 +318,47 @@ export default function Salaries() {
         </div>
       )}
 
-      <h2 className="print-only">{report === "actual" ? "Actual salary report" : "Paysheet salary report"} — {monthLabel(month)} ({isActual ? "days" : "working days"}: {shownDays})</h2>
+      <h2 className="print-only">{isCasuals ? `Casuals paysheet — ${monthLabel(month)}` : `${report === "actual" ? "Actual salary report" : "Paysheet salary report"} — ${monthLabel(month)} (${isActual ? "days" : "working days"}: ${shownDays})`}</h2>
 
-      {report === "actual" ? (
+      {isCasuals ? (
+      <div className="table-wrap">
+        <table className="data pay">
+          <thead>
+            <tr>
+              <th>S.No</th><th>Name</th>
+              <th className="num">Rate</th><th className="num">Days</th><th className="num">OT</th>
+              <th className="num">D.Amt</th><th className="num">OT Amt</th><th className="num">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {casualRows.map((r) => (
+              <tr key={r.employeeId}>
+                <td>{r.sno}</td><td>{r.name}</td>
+                <td className="num">{inr(r.rate)}</td>
+                <td className="num">{inr(r.days)}</td>
+                <td className="num">{casualOtCell(r)}</td>
+                <td className="num">{inr(r.dAmt)}</td>
+                <td className="num">{inr(r.otAmt)}</td>
+                <td className="num"><strong>{inr(r.total)}</strong></td>
+              </tr>
+            ))}
+            {casualRows.length === 0 && <tr><td colSpan={8} className="empty">No casual employees to show for this month yet.</td></tr>}
+          </tbody>
+          {casualRows.length > 0 && (
+            <tfoot>
+              <tr>
+                <td colSpan={3}>Total ({casualRows.length})</td>
+                <td className="num">{inr(casualTotal("days"))}</td>
+                <td className="num">{inr(casualTotal("ot"))}</td>
+                <td className="num">{inr(casualTotal("dAmt"))}</td>
+                <td className="num">{inr(casualTotal("otAmt"))}</td>
+                <td className="num">{inr(casualTotal("total"))}</td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+      ) : report === "actual" ? (
       <div className="table-wrap">
         <table className="data pay">
           <thead>

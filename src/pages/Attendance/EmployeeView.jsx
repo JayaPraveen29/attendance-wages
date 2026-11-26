@@ -1,5 +1,5 @@
 // Employee view: pick ONE employee, then mark any day in a From–To range for them.
-// Workers also get an OT (hours) box for each day.
+// Workers and Casuals also get an OT (hours) box for each day.
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { listenAttendanceDetails, setAttendance, setOvertime, STATUSES } from "../../lib/attendance";
@@ -34,7 +34,7 @@ export default function EmployeeView({ employees }) {
 
   const active = useMemo(() => employees.filter((e) => e.active), [employees]);
   const emp = employees.find((e) => e.id === empId);
-  const worker = emp?.category === "Workers";
+  const worker = emp?.category === "Workers" || emp?.category === "Casuals"; // gets an OT box
 
   const days = useMemo(() => datesBetween(from, to), [from, to]);
   const tooLong = days.length > MAX_DAYS;
