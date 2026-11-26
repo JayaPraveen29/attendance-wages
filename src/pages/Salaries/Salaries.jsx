@@ -9,7 +9,7 @@ import {
   DEFAULT_WORKING_DAYS, computeRow, sumRows,
   listenPayrollMonth, listenEntries, saveEntry, savePayrollMonth, finalizeMonth, reopenMonth,
 } from "../../lib/payroll";
-import { thisMonth, datesOfMonth, monthLabel } from "../../lib/dates";
+import { thisMonth, datesOfMonth, daysInMonth, monthLabel } from "../../lib/dates";
 import { toCsv, downloadCsv } from "../../lib/csv";
 import "./Salaries.css";
 
@@ -17,34 +17,35 @@ const inr = (n) => Number(n || 0).toLocaleString("en-IN", { minimumFractionDigit
 
 // Present shown on the sheet = full days + half of each half day (e.g. 20 + 2 half days = 21)
 const presentDays = (r) => r.present + 0.5 * r.halfDay;
-// LP = working days - P - L (loss-of-pay days), as in the paysheet
-const lpDays = (r, wd) => (r.lp !== undefined ? r.lp : Math.max(0, wd - presentDays(r) - r.leave));
-
-
-// Paysheet salary / working days (older finalized snapshots don't store it, so work it out)
-const perDayOf = (r, wd) => (r.perDay !== undefined ? r.perDay : Math.round((r.paysheetSalary / Math.max(1, wd)) * 100) / 100);
+// Actual report: LP = days box (defaults to calendar days in the month) - P - L
+const lpDays = (r, days) => Math.max(0, days - presentDays(r) - r.leave);
+// Paysheet report: P = the paysheet-calculated days (the "Days" value), L = 0,
+// LP = paysheet days (26 = month less 4 Sundays; the "Working days" box) - P - L
+const paysheetP = (r) => r.bankDays ?? 0;
+const paysheetLp = (r, wd) => Math.max(0, wd - paysheetP(r));
+// Paysheet report: total deductions = the EPF + ESI + PT columns shown on that sheet
+const paysheetDeductions = (r) => (Number(r.epf) || 0) + (Number(r.esi) || 0) + (Number(r.pt) || 0);
 
 // Sort by Emp ID (numeric when possible), then name
 const byCode = (a, b) =>
   String(a.code ?? "").localeCompare(String(b.code ?? ""), undefined, { numeric: true }) ||
   String(a.name ?? "").localeCompare(String(b.name ?? ""));
 
-const CSV_COLUMNS = (wd) => [
+const CSV_COLUMNS = (days) => [
   { header: "Emp ID", value: (r) => r.code },
   { header: "Name", value: (r) => r.name },
   { header: "P", value: (r) => presentDays(r) },
   { header: "L", value: (r) => r.leave },
-  { header: "LP", value: (r) => lpDays(r, wd) },
+  { header: "LP", value: (r) => lpDays(r, days) },
   { header: "Salary", value: (r) => r.gross },
-  { header: "Paysheet", value: (r) => r.paysheetSalary },
+  { header: "Days Amt", value: (r) => r.earned },
   { header: "OT HRS", value: (r) => r.otHours },
   { header: "OT AMT", value: (r) => r.otAmt },
-  { header: "Days Amt", value: (r) => r.earned },
   { header: "Total", value: (r) => r.totalEarnings },
   { header: "ADV", value: (r) => r.advance },
-  { header: "PT", value: (r) => r.pt },
   { header: "EPF", value: (r) => r.epf },
   { header: "ESI", value: (r) => r.esi },
+  { header: "PT", value: (r) => r.pt },
   { header: "Bank", value: (r) => r.bank ?? r.net },
   { header: "Amt (Cash)", value: (r) => r.cash ?? 0 },
   { header: "Bank Name", value: (r) => r.bankName },
@@ -55,19 +56,16 @@ const CSV_COLUMNS = (wd) => [
 const PAYSHEET_CSV_COLUMNS = (wd) => [
   { header: "Emp ID", value: (r) => r.code },
   { header: "Name", value: (r) => r.name },
-  { header: "P", value: (r) => presentDays(r) },
-  { header: "L", value: (r) => r.leave },
-  { header: "LP", value: (r) => lpDays(r, wd) },
-  { header: "Paysheet", value: (r) => r.paysheetSalary },
-  { header: "Per day", value: (r) => perDayOf(r, wd) },
-  { header: "Total", value: (r) => r.totalEarnings },
-  { header: "Days", value: (r) => r.bankDays ?? "" },
+  { header: "P", value: (r) => paysheetP(r) },
+  { header: "L", value: () => 0 },
+  { header: "LP", value: (r) => paysheetLp(r, wd) },
+  { header: "Paysheet salary", value: (r) => r.paysheetSalary },
   { header: "Salary payable", value: (r) => r.bankGross ?? "" },
-  { header: "ADV", value: (r) => r.advance },
-  { header: "PT", value: (r) => r.pt },
   { header: "EPF", value: (r) => r.epf },
   { header: "ESI", value: (r) => r.esi },
-  { header: "Bank", value: (r) => r.bank ?? r.net },
+  { header: "PT", value: (r) => r.pt },
+  { header: "Total deductions", value: (r) => paysheetDeductions(r) },
+  { header: "Bank transfer", value: (r) => r.bank ?? r.net },
   { header: "Bank Name", value: (r) => r.bankName },
   { header: "Account number", value: (r) => r.accountNumber },
   { header: "IFSC", value: (r) => r.ifsc },
@@ -100,7 +98,15 @@ export default function Salaries() {
   }, [month]);
 
   const finalized = !!payroll?.finalized;
-  const workingDays = payroll?.workingDays ?? DEFAULT_WORKING_DAYS;
+  // Two separate day counts, each saved on the month's payroll record:
+  //   actualDays  - Actual report, defaults to the calendar days of the month (30 / 31 ...)
+  //   paysheetDays - Paysheet report, defaults to 26 (month less 4 Sundays); also drives the bank / cash split
+  // (an old "workingDays" value saved on the month is deliberately ignored, so each report starts from its own default)
+  const monthDays = daysInMonth(month);
+  const workingDays = payroll?.paysheetDays ?? DEFAULT_WORKING_DAYS;
+  const actualDays = payroll?.actualDays ?? monthDays;
+  const isActual = report === "actual";
+  const shownDays = isActual ? actualDays : workingDays;
   // attMap: `${employeeId}_${date}` -> { status, ot }
   const counts = useMemo(() => {
     const statusMap = {};
@@ -146,14 +152,14 @@ export default function Salaries() {
     const n = Number(wdDraft);
     setWdDraft(null);
     if (!(n >= 1 && n <= 31)) return setNotice({ type: "error", text: "Working days must be between 1 and 31." });
-    try { await savePayrollMonth(month, { workingDays: n }); } catch (e) { fail(e); }
+    try { await savePayrollMonth(month, { [isActual ? "actualDays" : "paysheetDays"]: n }); } catch (e) { fail(e); }
   };
 
   const finalize = async () => {
     if (!rows.length) return;
     if (!window.confirm(`Finalize ${monthLabel(month)}? The figures are frozen as shown. You can still reopen the month later.`)) return;
     try {
-      await savePayrollMonth(month, { workingDays });
+      await savePayrollMonth(month, { paysheetDays: workingDays, actualDays });
       await finalizeMonth(month, rows, profile.name);
       setNotice({ type: "ok", text: `${monthLabel(month)} finalized.` });
     } catch (e) { fail(e); }
@@ -167,7 +173,7 @@ export default function Salaries() {
 
   const exportCsv = () => downloadCsv(
     `${report === "actual" ? "salaries" : "paysheet"}-${month}.csv`,
-    toCsv(rows, report === "actual" ? CSV_COLUMNS(workingDays) : PAYSHEET_CSV_COLUMNS(workingDays)),
+    toCsv(rows, report === "actual" ? CSV_COLUMNS(actualDays) : PAYSHEET_CSV_COLUMNS(workingDays)),
   );
 
   const cellInput = (r, k, placeholder) => {
@@ -214,14 +220,14 @@ export default function Salaries() {
           <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
         </label>
         <label className="field">Report
-          <select value={report} onChange={(e) => setReport(e.target.value)}>
+          <select value={report} onChange={(e) => { setReport(e.target.value); setWdDraft(null); }}>
             <option value="actual">Actual salary report</option>
             <option value="paysheet">Paysheet salary report</option>
           </select>
         </label>
-        <label className="field">Working days
+        <label className="field">{isActual ? "Days in month" : "Working days"}
           <input type="number" min="1" max="31" style={{ width: 100 }} disabled={finalized}
-            value={wdDraft ?? workingDays}
+            value={wdDraft ?? shownDays}
             onChange={(e) => setWdDraft(e.target.value)} onBlur={commitWorkingDays} />
         </label>
         {finalized
@@ -249,7 +255,7 @@ export default function Salaries() {
         </div>
       )}
 
-      <h2 className="print-only">{report === "actual" ? "Actual salary report" : "Paysheet salary report"} — {monthLabel(month)} (working days: {workingDays})</h2>
+      <h2 className="print-only">{report === "actual" ? "Actual salary report" : "Paysheet salary report"} — {monthLabel(month)} ({isActual ? "days" : "working days"}: {shownDays})</h2>
 
       {report === "actual" ? (
       <div className="table-wrap">
@@ -258,10 +264,10 @@ export default function Salaries() {
             <tr>
               <th>Emp ID</th><th>Name</th>
               <th className="num">P</th><th className="num">L</th><th className="num">LP</th>
-              <th className="num">Salary</th><th className="num">Paysheet</th>
-              <th className="num">OT HRS</th><th className="num">OT AMT</th><th className="num">Days Amt</th>
+              <th className="num">Salary</th><th className="num">Days Amt</th>
+              <th className="num">OT HRS</th><th className="num">OT AMT</th>
               <th className="num">Total</th><th className="num">ADV</th>
-              <th className="num">PT</th><th className="num">EPF</th><th className="num">ESI</th>
+              <th className="num">EPF</th><th className="num">ESI</th><th className="num">PT</th>
               <th className="num">Bank</th><th className="num">Amt (Cash)</th>
             </tr>
           </thead>
@@ -271,22 +277,21 @@ export default function Salaries() {
                 <td>{r.code}</td><td>{r.name}</td>
                 <td className="num">{presentDays(r)}</td>
                 <td className="num">{r.leave}</td>
-                <td className="num">{lpDays(r, workingDays)}</td>
+                <td className="num">{lpDays(r, actualDays)}</td>
                 <td className="num">{inr(r.gross)}</td>
-                <td className="num">{inr(r.paysheetSalary)}</td>
+                <td className="num">{inr(r.earned)}</td>
                 <td className="num">{inr(r.otHours)}</td>
                 <td className="num">{inr(r.otAmt)}</td>
-                <td className="num">{inr(r.earned)}</td>
                 <td className="num"><strong>{inr(r.totalEarnings)}</strong></td>
                 <td className="num">{dblCell(r, "advance")}</td>
-                <td className="num">{inr(r.pt)}</td>
                 <td className="num">{dblCell(r, "epf")}</td>
                 <td className="num">{dblCell(r, "esi")}</td>
+                <td className="num">{inr(r.pt)}</td>
                 <td className="num"><strong>{inr(r.bank ?? r.net)}</strong></td>
                 <td className="num">{inr(r.cash ?? 0)}</td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td colSpan={17} className="empty">No employees to show for this month yet.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={16} className="empty">No employees to show for this month yet.</td></tr>}
           </tbody>
           {rows.length > 0 && (
             <tfoot>
@@ -294,15 +299,14 @@ export default function Salaries() {
                 <td colSpan={2}>Total ({rows.length})</td>
                 <td colSpan={3}></td>
                 <td className="num">{inr(total("gross"))}</td>
-                <td className="num">{inr(total("paysheetSalary"))}</td>
+                <td className="num">{inr(total("earned"))}</td>
                 <td className="num">{inr(total("otHours"))}</td>
                 <td className="num">{inr(total("otAmt"))}</td>
-                <td className="num">{inr(total("earned"))}</td>
                 <td className="num">{inr(total("totalEarnings"))}</td>
                 <td className="num">{inr(total("advance"))}</td>
-                <td className="num">{inr(total("pt"))}</td>
                 <td className="num">{inr(total("epf"))}</td>
                 <td className="num">{inr(total("esi"))}</td>
+                <td className="num">{inr(total("pt"))}</td>
                 <td className="num">{inr(rows.reduce((t, r) => t + (r.bank ?? r.net), 0))}</td>
                 <td className="num">{inr(total("cash"))}</td>
               </tr>
@@ -317,33 +321,29 @@ export default function Salaries() {
             <tr>
               <th>Emp ID</th><th>Name</th>
               <th className="num">P</th><th className="num">L</th><th className="num">LP</th>
-              <th className="num">Paysheet</th><th className="num">Per day</th>
-              <th className="num">Total</th><th className="num">Days</th><th className="num">Salary payable</th>
-              <th className="num">ADV</th><th className="num">PT</th>
-              <th className="num">EPF</th><th className="num">ESI</th>
-              <th className="num">Bank</th>
+              <th className="num">Paysheet salary</th><th className="num">Salary payable</th>
+              <th className="num">EPF</th><th className="num">ESI</th><th className="num">PT</th>
+              <th className="num">Total deductions</th>
+              <th className="num">Bank transfer</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.employeeId}>
                 <td>{r.code}</td><td>{r.name}</td>
-                <td className="num">{presentDays(r)}</td>
-                <td className="num">{r.leave}</td>
-                <td className="num">{lpDays(r, workingDays)}</td>
+                <td className="num">{paysheetP(r)}</td>
+                <td className="num">0</td>
+                <td className="num">{paysheetLp(r, workingDays)}</td>
                 <td className="num">{inr(r.paysheetSalary)}</td>
-                <td className="num">{inr(perDayOf(r, workingDays))}</td>
-                <td className="num"><strong>{inr(r.totalEarnings)}</strong></td>
-                <td className="num">{r.bankDays ?? "-"}</td>
                 <td className="num">{r.bankGross !== undefined ? inr(r.bankGross) : "-"}</td>
-                <td className="num">{dblCell(r, "advance")}</td>
-                <td className="num">{inr(r.pt)}</td>
                 <td className="num">{dblCell(r, "epf")}</td>
                 <td className="num">{dblCell(r, "esi")}</td>
+                <td className="num">{inr(r.pt)}</td>
+                <td className="num">{inr(paysheetDeductions(r))}</td>
                 <td className="num"><strong>{inr(r.bank ?? r.net)}</strong></td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td colSpan={15} className="empty">No employees to show for this month yet.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={11} className="empty">No employees to show for this month yet.</td></tr>}
           </tbody>
           {rows.length > 0 && (
             <tfoot>
@@ -351,14 +351,11 @@ export default function Salaries() {
                 <td colSpan={2}>Total ({rows.length})</td>
                 <td colSpan={3}></td>
                 <td className="num">{inr(total("paysheetSalary"))}</td>
-                <td></td>
-                <td className="num">{inr(total("totalEarnings"))}</td>
-                <td></td>
                 <td className="num">{inr(total("bankGross"))}</td>
-                <td className="num">{inr(total("advance"))}</td>
-                <td className="num">{inr(total("pt"))}</td>
                 <td className="num">{inr(total("epf"))}</td>
                 <td className="num">{inr(total("esi"))}</td>
+                <td className="num">{inr(total("pt"))}</td>
+                <td className="num">{inr(rows.reduce((t, r) => t + paysheetDeductions(r), 0))}</td>
                 <td className="num">{inr(rows.reduce((t, r) => t + (r.bank ?? r.net), 0))}</td>
               </tr>
             </tfoot>
