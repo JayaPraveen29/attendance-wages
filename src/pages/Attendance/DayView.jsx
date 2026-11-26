@@ -113,7 +113,7 @@ export default function DayView({ employees }) {
       {tooLong && <div className="msg error">Please pick a range of up to {MAX_DAYS} days.</div>}
       <div className="stats">
         {summary.map(([s, n]) => (
-          <div key={s} className={`stat ${{ Present: "present", "Half day": "half", Leave: "leave", Absent: "absent" }[s]}`}>
+          <div key={s} className={`stat ${{ Present: "present", "Half day": "half", Leave: "leave", Absent: "absent", Holiday: "holiday" }[s]}`}>
             <div className="label">{s}</div><div className="value">{n}</div>
           </div>
         ))}

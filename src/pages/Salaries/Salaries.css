@@ -11,3 +11,5 @@
   table.pay th, table.pay td { font-size: 10.5px; padding: 3px 4px; }
   .cell-input { border: none; width: 60px; padding: 0; }
 }
+.adv-cell{cursor:pointer;display:inline-block;min-width:48px;padding:4px 6px;border-radius:6px}
+.adv-cell:hover{background:rgba(0,0,0,.05)}

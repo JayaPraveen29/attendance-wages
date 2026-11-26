@@ -6,6 +6,7 @@
 .seg-btn.on.Halfday { background: #c98a00; color: #fff; }
 .seg-btn.on.Leave { background: var(--steel); color: #fff; }
 .seg-btn.on.Absent { background: var(--error); color: #fff; }
+.seg-btn.on.Holiday { background: #6b4fbb; color: #fff; }
 
 table.grid th, table.grid td { padding: 5px 6px; font-size: 12.5px; }
 table.grid td.cell { text-align: center; font-weight: 700; }
@@ -13,4 +14,5 @@ td.cell.Present { background: #e6f4ea; color: var(--success); }
 td.cell.Halfday { background: #fff4d6; color: var(--warn); }
 td.cell.Leave { background: #e8ecf1; color: var(--steel); }
 td.cell.Absent { background: #fdecea; color: var(--error); }
+td.cell.Holiday { background: #eee9fa; color: #6b4fbb; }
 tr.today-row td { background: #fffaf0; }

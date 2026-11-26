@@ -16,14 +16,25 @@ import { db } from "../firebase";
 //
 //   LP (loss of pay days)  = working days - P - L
 //   Paid days              = P + L                    (P counts a half day as 0.5)
-//   Salary payable         = ROUND(Gross / working days * paid days, 0)
-//   Total payable          = Salary payable + HRA
-//   EPF                    = ROUND(12% of Salary payable, capped at the EPF wage ceiling, 0)
-//   ESI                    = ROUNDUP(0.75% of Salary payable, capped at 21,000, 0)   (HRA is NOT included)
-//   PT                     = by Gross salary slab (editable per row)
-//   Total deductions       = Adv + EPF + ESI + PT
-//   Bank transfer (net)    = Total payable - Total deductions
+//   Salary payable         = ROUND(Actual salary / 30 * paid days, 0)
+//   OT amount              = ROUND(Actual salary / 30 / 8 * OT hours, 0)
+//   Total                  = Salary payable + OT, rounded to nearest 10
+//   PT                     = by Paysheet salary slab (editable per row)
+//   EPF / ESI              = entered manually per row (not auto-calculated for now)
+//
+//   Bank / Cash split:
+//     Paysheet per day     = Paysheet salary / working days
+//     Bank days            = Total / Paysheet per day, rounded DOWN to the nearest 0.5
+//     Bank gross           = ROUND(Paysheet per day * Bank days, 0)
+//     Bank                 = Bank gross - PT
+//     Cash                 = Total - Bank gross - EPF - ESI - Adv, rounded to nearest 10
 export const DEFAULT_WORKING_DAYS = 26;
+
+// Salary and OT are always calculated on a 30-day month (paysheet rule).
+// Working days is only used for LP (loss of pay days).
+export const PAY_DIVISOR = 30;
+export const OT_HOURS_PER_DAY = 8;
+const roundTo10 = (n) => Math.round(n / 10) * 10;
 
 // Approved "Leave" counts as a paid day (the sheet pays P + L).
 export const LEAVE_IS_PAID = true;
@@ -53,7 +64,9 @@ const num = (v) => (v === "" || v == null || isNaN(Number(v)) ? 0 : Number(v));
 export function computeRow({ employee, counts, workingDays, entry, month }) {
   const c = counts || { Present: 0, "Half day": 0, Leave: 0, Absent: 0 };
   const e = entry || {};
-  const gross = num(employee.grossSalary);
+  // gross = Actual Salary (shown as is). paysheetSalary = Paysheet salary, which only PT is calculated on (earned salary and OT use gross / Actual Salary).
+  const gross = num(employee.actualSalary) > 0 ? num(employee.actualSalary) : num(employee.grossSalary);
+  const paysheetSalary = num(employee.statutorySalary) > 0 ? num(employee.statutorySalary) : gross;
   const wd = Math.max(1, num(workingDays));
 
   const p = c.Present + 0.5 * c["Half day"];                 // P
@@ -62,20 +75,28 @@ export function computeRow({ employee, counts, workingDays, entry, month }) {
   const paidDays = Math.min(wd, p + (LEAVE_IS_PAID ? l : 0)); // Paid
 
   // Salary payable, whole rupees (same order of operations as the sheet: Gross / days * paid)
-  const earned = Math.round((gross / wd) * paidDays);
-  const hra = r2(num(e.hra));
+  const earned = Math.round((gross / PAY_DIVISOR) * paidDays);   // Salary payable, on Actual Salary
+  const otHours = num(e.otHours);
+  const otAmt = Math.round((gross / PAY_DIVISOR / OT_HOURS_PER_DAY) * otHours); // OT is on Actual Salary
+  const hra = 0; // HRA column removed from the sheet
 
-  // EPF / ESI work on whole rupees, so integer maths keeps them exact.
-  const epfBase = Math.min(earned, epfCapFor(month));
-  const epf = employee.epf ? Math.round((epfBase * 12) / 100) : 0;
-  const esiBase = Math.min(earned, ESI_WAGE_CAP);
-  const esi = employee.esi ? Math.ceil((esiBase * 75) / 10000) : 0;
+  // EPF / ESI are entered manually for now (no auto calculation)
+  const epf = r2(num(e.epf));
+  const esi = r2(num(e.esi));
 
   const ptOverridden = e.pt !== "" && e.pt != null;
-  const pt = ptOverridden ? r2(num(e.pt)) : paidDays > 0 ? ptForSalary(gross) : 0;
+  const pt = ptOverridden ? r2(num(e.pt)) : paidDays > 0 ? ptForSalary(paysheetSalary) : 0;
   const advance = r2(num(e.advance));
 
-  const totalEarnings = r2(earned + hra);                    // Total payable
+  const totalEarnings = roundTo10(earned + otAmt);           // Total (Salary payable + OT, nearest 10)
+
+  // ---- Bank / Cash split ----
+  const perDay = paysheetSalary / wd;                         // Paysheet salary / working days
+  const bankDays = perDay > 0 ? Math.floor((totalEarnings / perDay) * 2 + 1e-9) / 2 : 0; // down to nearest 0.5
+  const bankGross = Math.round(perDay * bankDays);
+  const bank = r2(bankGross - pt);                            // Bank = Bank gross - PT
+  const cash = roundTo10(totalEarnings - bankGross - epf - esi - advance); // Cash = Total - Bank gross - EPF - ESI - Adv, nearest 10
+
   const totalDeductions = r2(advance + epf + esi + pt);      // Total deductions
 
   return {
@@ -86,11 +107,12 @@ export function computeRow({ employee, counts, workingDays, entry, month }) {
     bankName: employee.bankName || "",
     accountNumber: employee.accountNumber || "",
     ifsc: employee.ifsc || "",
-    gross,
+    gross, paysheetSalary,
     present: c.Present, halfDay: c["Half day"], leave: l, absent: c.Absent, lp,
-    paidDays, earned, hra, epf, esi, pt, ptOverridden, advance,
+    paidDays, earned, otHours, otAmt, hra, epf, esi, pt, ptOverridden, advance,
     totalEarnings, totalDeductions,
-    net: r2(totalEarnings - totalDeductions),
+    perDay: r2(perDay), bankDays, bankGross, bank, cash,
+    net: r2(bank + cash),                                      // total actually paid out (Bank + Cash)
   };
 }
 
