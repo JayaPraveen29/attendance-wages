@@ -65,6 +65,15 @@ const CASUAL_CSV_COLUMNS = [
   { header: "Total", value: (r) => r.total },
 ];
 
+// Directors paysheet: S.No, Name, Income, TDS
+const DIRECTOR_CSV_COLUMNS = [
+  { header: "S.No", value: (r) => r.sno },
+  { header: "Name", value: (r) => r.name },
+  { header: "Income", value: (r) => r.income },
+  { header: "TDS", value: (r) => r.tds },
+  { header: "Total", value: (r) => r.total },
+];
+
 const PAYSHEET_CSV_COLUMNS = (wd) => [
   { header: "Emp ID", value: (r) => r.code },
   { header: "Name", value: (r) => r.name },
@@ -119,6 +128,8 @@ export default function Salaries() {
   const actualDays = payroll?.actualDays ?? monthDays;
   const isActual = report === "actual";
   const isCasuals = report === "casuals";
+  const isDirectors = report === "directors";
+  const separate = isCasuals || isDirectors; // these two reports have their own tables, no days box / finalize
   const shownDays = isActual ? actualDays : workingDays;
   // attMap: `${employeeId}_${date}` -> { status, ot }
   const counts = useMemo(() => {
@@ -142,6 +153,7 @@ export default function Salaries() {
   const rows = useMemo(() => {
     if (finalized) return payroll.snapshot || [];
     return employees
+      .filter((e) => e.category === "Workers") // Actual and Paysheet reports are for Workers only
       .filter((e) => e.active || (counts[e.id] && Object.values(counts[e.id]).some(Boolean)))
       .map((e) => computeRow({ employee: e, month, counts: counts[e.id], workingDays, entry: { ...(entries[e.id] || {}), ...(drafts[e.id] || {}), otHours: otByEmp[e.id] || 0 } }))
       .sort(byCode);
@@ -153,7 +165,7 @@ export default function Salaries() {
   //   Rate   = what was entered on the employee: the day salary, or the monthly salary
   //   Days   = Present (a half day counts as 0.5); Leave and Holiday are not counted
   //   OT     = OT hours: typed here (double-click), otherwise the OT hours from Attendance
-  //   D.Amt  = day rate x Days        OT Amt = day rate / 8 x OT      Total = D.Amt + OT Amt
+  //   D.Amt  = day rate x Days        OT Amt = day rate / 8 x OT      Total = D.Amt + OT Amt, rounded to the nearest 10 (6,405 -> 6,410, 6,404 -> 6,400)
   //            (day rate = Rate, or Rate / 30 when the Rate is a monthly salary)
   const casualRows = useMemo(() => (
     employees
@@ -170,10 +182,27 @@ export default function Salaries() {
         const ot = m.casualOt !== undefined && m.casualOt !== "" ? Number(m.casualOt) || 0 : (otByEmp[e.id] || 0);
         const dAmt = Math.round(dayRate * days);
         const otAmt = Math.round((dayRate / OT_HOURS_PER_DAY) * ot);
-        return { employeeId: e.id, sno: i + 1, name: e.name, rate, days, ot, dAmt, otAmt, total: dAmt + otAmt };
+        return { employeeId: e.id, sno: i + 1, name: e.name, rate, days, ot, dAmt, otAmt, total: Math.round((dAmt + otAmt) / 10) * 10 };
       })
   ), [employees, counts, otByEmp, entries, drafts]);
   const casualTotal = (k) => sumRows(casualRows, k);
+
+  // ---- Directors paysheet ---- (no attendance, no OT)
+  //   Income = the salary entered on the employee      TDS = typed here (double-click), saved per month (a deduction)
+  //   Total  = Income - TDS
+  const directorRows = useMemo(() => (
+    employees
+      .filter((e) => e.category === "Directors" && e.active)
+      .sort(byCode)
+      .map((e, i) => {
+        const m = { ...(entries[e.id] || {}), ...(drafts[e.id] || {}) };
+        return { employeeId: e.id, sno: i + 1, name: e.name, income: Number(e.grossSalary) || 0, tds: Number(m.tds) || 0 };
+      })
+      .map((r) => {
+        return { ...r, total: r.income - r.tds };
+      })
+  ), [employees, entries, drafts]);
+  const directorTotal = (k) => sumRows(directorRows, k);
 
   // ---- editing ----
   const setDraft = (id, k, v) => setDrafts((d) => ({ ...d, [id]: { ...(d[id] || {}), [k]: v } }));
@@ -211,8 +240,9 @@ export default function Salaries() {
   };
 
   const exportCsv = () => downloadCsv(
-    `${isCasuals ? "casuals-paysheet" : report === "actual" ? "salaries" : "paysheet"}-${month}.csv`,
-    isCasuals ? toCsv(casualRows, CASUAL_CSV_COLUMNS)
+    `${isDirectors ? "directors-paysheet" : isCasuals ? "casuals-paysheet" : report === "actual" ? "salaries" : "paysheet"}-${month}.csv`,
+    isDirectors ? toCsv(directorRows, DIRECTOR_CSV_COLUMNS)
+      : isCasuals ? toCsv(casualRows, CASUAL_CSV_COLUMNS)
       : toCsv(rows, report === "actual" ? CSV_COLUMNS(actualDays) : PAYSHEET_CSV_COLUMNS(workingDays)),
   );
 
@@ -250,8 +280,8 @@ export default function Salaries() {
   };
 
   // ADV / EPF / ESI: double-click to edit
-  const dblCell = (r, k) => {
-    if (finalized) return inr(r[k]);
+  const dblCell = (r, k, alwaysEditable = false) => {
+    if (finalized && !alwaysEditable) return inr(r[k]);
     if (editCell && editCell.id === r.employeeId && editCell.k === k) {
       return (
         <input
@@ -284,32 +314,33 @@ export default function Salaries() {
             <option value="actual">Actual salary report</option>
             <option value="paysheet">Paysheet salary report</option>
             <option value="casuals">Casuals paysheet</option>
+            <option value="directors">Directors paysheet</option>
           </select>
         </label>
-        {!isCasuals && (
+        {!separate && (
           <label className="field">{isActual ? "Days in month" : "Working days"}
             <input type="number" min="1" max="31" style={{ width: 100 }} disabled={finalized}
               value={wdDraft ?? shownDays}
               onChange={(e) => setWdDraft(e.target.value)} onBlur={commitWorkingDays} />
           </label>
         )}
-        {!isCasuals && (finalized
+        {!separate && (finalized
           ? <button className="btn secondary" onClick={reopen}>Edit finalized month</button>
           : <button className="btn" onClick={finalize} disabled={!rows.length}>Finalize month</button>)}
-        <button className="btn secondary" onClick={() => window.print()} disabled={!(isCasuals ? casualRows : rows).length}>Print paysheet</button>
-        <button className="btn secondary" onClick={exportCsv} disabled={!(isCasuals ? casualRows : rows).length}>Export CSV</button>
+        <button className="btn secondary" onClick={() => window.print()} disabled={!(isDirectors ? directorRows : isCasuals ? casualRows : rows).length}>Print paysheet</button>
+        <button className="btn secondary" onClick={exportCsv} disabled={!(isDirectors ? directorRows : isCasuals ? casualRows : rows).length}>Export CSV</button>
       </div>
 
-      {!isCasuals && finalized && (
+      {!separate && finalized && (
         <div className="msg warn no-print">
           Finalized{payroll.finalizedBy ? ` by ${payroll.finalizedBy}` : ""}. Figures are frozen; use “Edit finalized month” to change them.
         </div>
       )}
-      {!isCasuals && !finalized && payroll?.editedAfterFinalize && (
+      {!separate && !finalized && payroll?.editedAfterFinalize && (
         <div className="msg warn no-print">This month was finalized earlier and reopened by {payroll.reopenedBy || "someone"}. Finalize again when done.</div>
       )}
 
-      {!isCasuals && rows.length > 0 && (
+      {!separate && rows.length > 0 && (
         <div className="stats no-print">
           <div className="stat"><div className="label">Employees</div><div className="value">{rows.length}</div></div>
           <div className="stat"><div className="label">Total earnings</div><div className="value">₹{inr(total("totalEarnings"))}</div></div>
@@ -318,9 +349,41 @@ export default function Salaries() {
         </div>
       )}
 
-      <h2 className="print-only">{isCasuals ? `Casuals paysheet — ${monthLabel(month)}` : `${report === "actual" ? "Actual salary report" : "Paysheet salary report"} — ${monthLabel(month)} (${isActual ? "days" : "working days"}: ${shownDays})`}</h2>
+      <h2 className="print-only">{isDirectors ? `Directors paysheet — ${monthLabel(month)}` : isCasuals ? `Casuals paysheet — ${monthLabel(month)}` : `${report === "actual" ? "Actual salary report" : "Paysheet salary report"} — ${monthLabel(month)} (${isActual ? "days" : "working days"}: ${shownDays})`}</h2>
 
-      {isCasuals ? (
+      {isDirectors ? (
+      <div className="table-wrap">
+        <table className="data pay">
+          <thead>
+            <tr>
+              <th>S.No</th><th>Name</th>
+              <th className="num">Income</th><th className="num">TDS</th><th className="num">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {directorRows.map((r) => (
+              <tr key={r.employeeId}>
+                <td>{r.sno}</td><td>{r.name}</td>
+                <td className="num">{inr(r.income)}</td>
+                <td className="num">{dblCell(r, "tds", true)}</td>
+                <td className="num"><strong>{inr(r.total)}</strong></td>
+              </tr>
+            ))}
+            {directorRows.length === 0 && <tr><td colSpan={5} className="empty">No directors to show yet.</td></tr>}
+          </tbody>
+          {directorRows.length > 0 && (
+            <tfoot>
+              <tr>
+                <td colSpan={2}>Total ({directorRows.length})</td>
+                <td className="num">{inr(directorTotal("income"))}</td>
+                <td className="num">{inr(directorTotal("tds"))}</td>
+                <td className="num">{inr(directorTotal("total"))}</td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+      ) : isCasuals ? (
       <div className="table-wrap">
         <table className="data pay">
           <thead>
@@ -385,8 +448,8 @@ export default function Salaries() {
                 <td className="num">{inr(r.otAmt)}</td>
                 <td className="num"><strong>{inr(r.totalEarnings)}</strong></td>
                 <td className="num">{dblCell(r, "advance")}</td>
-                <td className="num">{dblCell(r, "epf")}</td>
-                <td className="num">{dblCell(r, "esi")}</td>
+                <td className="num">{inr(r.epf)}</td>
+                <td className="num">{inr(r.esi)}</td>
                 <td className="num">{inr(r.pt)}</td>
                 <td className="num"><strong>{inr(r.bank ?? r.net)}</strong></td>
                 <td className="num">{inr(r.cash ?? 0)}</td>
@@ -437,8 +500,8 @@ export default function Salaries() {
                 <td className="num">{paysheetLp(r, workingDays)}</td>
                 <td className="num">{inr(r.paysheetSalary)}</td>
                 <td className="num">{r.bankGross !== undefined ? inr(r.bankGross) : "-"}</td>
-                <td className="num">{dblCell(r, "epf")}</td>
-                <td className="num">{dblCell(r, "esi")}</td>
+                <td className="num">{inr(r.epf)}</td>
+                <td className="num">{inr(r.esi)}</td>
                 <td className="num">{inr(r.pt)}</td>
                 <td className="num">{inr(paysheetDeductions(r))}</td>
                 <td className="num"><strong>{inr(r.bank ?? r.net)}</strong></td>

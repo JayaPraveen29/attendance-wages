@@ -20,7 +20,8 @@ import { db } from "../firebase";
 //   OT amount              = ROUND(Actual salary / 30 / 8 * OT hours, 0)
 //   Total                  = Salary payable + OT, rounded to nearest 10
 //   PT                     = by Paysheet salary slab (editable per row)
-//   EPF / ESI              = entered manually per row (not auto-calculated for now)
+//   EPF                    = 12% of Salary payable (Bank gross), only if Paysheet salary is 25,000 or less
+//   ESI                    = 0.75% of Salary payable (Bank gross), only if Paysheet salary is 21,000 or less
 //
 //   Bank / Cash split:
 //     Paysheet per day     = Paysheet salary / working days
@@ -46,6 +47,10 @@ export const EPF_WAGE_CAP_NEW = 25000;
 export const EPF_NEW_CAP_FROM = "2026-09";
 export const epfCapFor = (month) => (!month || month >= EPF_NEW_CAP_FROM ? EPF_WAGE_CAP_NEW : EPF_WAGE_CAP_OLD);
 
+// EPF applies only when the Paysheet salary is up to this; above it no EPF is deducted.
+export const EPF_PAYSHEET_LIMIT = 25000;
+// ESI applies only when the Paysheet salary is up to this.
+export const ESI_PAYSHEET_LIMIT = 21000;
 export const ESI_RATE = 0.0075;         // 0.75% employee share
 export const ESI_WAGE_CAP = 21000;      // contribution is calculated on at most this much
 
@@ -80,10 +85,6 @@ export function computeRow({ employee, counts, workingDays, entry, month }) {
   const otAmt = Math.round((gross / PAY_DIVISOR / OT_HOURS_PER_DAY) * otHours); // OT is on Actual Salary
   const hra = 0; // HRA column removed from the sheet
 
-  // EPF / ESI are entered manually for now (no auto calculation)
-  const epf = r2(num(e.epf));
-  const esi = r2(num(e.esi));
-
   const ptOverridden = e.pt !== "" && e.pt != null;
   const pt = ptOverridden ? r2(num(e.pt)) : paidDays > 0 ? ptForSalary(paysheetSalary) : 0;
   const advance = r2(num(e.advance));
@@ -94,6 +95,9 @@ export function computeRow({ employee, counts, workingDays, entry, month }) {
   const perDay = paysheetSalary / wd;                         // Paysheet salary / working days
   const bankDays = perDay > 0 ? Math.floor((totalEarnings / perDay) * 2 + 1e-9) / 2 : 0; // down to nearest 0.5
   const bankGross = Math.round(perDay * bankDays);
+  // EPF / ESI are worked out on Salary payable (= Bank gross), depending on the Paysheet salary
+  const epf = paysheetSalary <= EPF_PAYSHEET_LIMIT ? Math.round(bankGross * EPF_RATE) : 0;
+  const esi = paysheetSalary <= ESI_PAYSHEET_LIMIT ? Math.round(bankGross * ESI_RATE) : 0;
   const bank = r2(bankGross - pt);                            // Bank = Bank gross - PT
   const cash = roundTo10(totalEarnings - bankGross - epf - esi - advance); // Cash = Total - Bank gross - EPF - ESI - Adv, nearest 10
 
