@@ -10,8 +10,11 @@ import {
 } from "../../lib/payroll";
 import { thisMonth, datesOfMonth, daysInMonth, monthLabel } from "../../lib/dates";
 import { exportXlsx, exportPdf } from "../../lib/exportFile";
-import StaffFilters, { NO_FILTER, matchesFilter } from "../../components/StaffFilters";
+import { NO_FILTER, matchesFilter } from "../../components/StaffFilters";
 import "./Salaries.css";
+
+// unique, sorted dropdown values
+const uniq = (list) => [...new Set(list.filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
 const inr = (n) => Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
@@ -102,7 +105,7 @@ export default function Salaries() {
   const [month, setMonth] = useState(thisMonth());
   const [report, setReport] = useState("actual"); // "actual" | "paysheet" | "adminPaysheet" | "fieldPaysheet" | "casuals" | "directors"
   const [allEmployees, setAllEmployees] = useState([]);
-  const [filters, setFilters] = useState(NO_FILTER); // Group / Unit / Category
+  const [filters, setFilters] = useState(NO_FILTER); // Group / Unit (category comes from the selected report)
   const [attMap, setAttMap] = useState({});
   const [entries, setEntries] = useState({});
   const [payroll, setPayroll] = useState(null);
@@ -323,7 +326,18 @@ export default function Salaries() {
             <option value="directors">Directors paysheet</option>
           </select>
         </label>
-        <StaffFilters employees={allEmployees} value={filters} onChange={setFilters} />
+        <label className="field">Group
+          <select className="staff-filter" value={filters.group} onChange={(e) => setFilters({ ...filters, group: e.target.value })}>
+            <option value="">All groups</option>
+            {uniq(allEmployees.map((e) => e.group)).map((g) => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </label>
+        <label className="field">Unit
+          <select className="staff-filter" value={filters.unit} onChange={(e) => setFilters({ ...filters, unit: e.target.value })}>
+            <option value="">All units</option>
+            {uniq(allEmployees.map((e) => e.unit)).map((u) => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </label>
         {!separate && (
           <label className="field">{isActual ? "Days in month" : "Working days"}
             <input type="number" min="1" max="31" style={{ width: 100 }}

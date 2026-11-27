@@ -31,6 +31,7 @@ export default function EmployeeView({ employees }) {
   const [otDraft, setOtDraft] = useState({}); // date -> text being typed
   const [error, setError] = useState("");
   const [busyDate, setBusyDate] = useState(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const active = useMemo(() => employees.filter((e) => e.active), [employees]);
   const emp = employees.find((e) => e.id === empId);
@@ -76,6 +77,17 @@ export default function EmployeeView({ employees }) {
     finally { setBusyDate(null); }
   };
 
+  // Mark every unmarked day in the From–To range as Present (days already marked are left alone)
+  const unmarkedDays = emp && !tooLong ? days.filter((d) => !rec(d)?.status) : [];
+  const markAllUnmarkedPresent = async () => {
+    if (!emp || !unmarkedDays.length) return;
+    if (!window.confirm(`Mark ${unmarkedDays.length} unmarked day(s) as Present for ${emp.name}?`)) return;
+    setError(""); setBulkBusy(true);
+    try { await Promise.all(unmarkedDays.map((d) => setAttendance(emp.id, d, "Present", profile.name))); }
+    catch (e) { setError(e.message); }
+    finally { setBulkBusy(false); }
+  };
+
   const saveOt = async (date) => {
     const draft = otDraft[date];
     if (draft === undefined) return;
@@ -103,6 +115,11 @@ export default function EmployeeView({ employees }) {
         <label className="field">To date
           <input type="date" value={to} min={from} onChange={(e) => changeTo(e.target.value)} />
         </label>
+        <button className="btn secondary" onClick={markAllUnmarkedPresent}
+          disabled={!emp || tooLong || bulkBusy || unmarkedDays.length === 0}
+          title={emp ? "Mark every unmarked day in this range as Present" : "Select an employee first"}>
+          Mark all unmarked Present
+        </button>
       </div>
       {tooLong && <div className="msg error">Please pick a range of up to {MAX_DAYS} days.</div>}
       {error && <div className="msg error">{error}</div>}
