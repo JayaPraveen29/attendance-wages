@@ -9,7 +9,7 @@ import {
   listenPayrollMonth, listenEntries, saveEntry, savePayrollMonth,
 } from "../../lib/payroll";
 import { thisMonth, datesOfMonth, daysInMonth, monthLabel } from "../../lib/dates";
-import { toCsv, downloadCsv } from "../../lib/csv";
+import { exportXlsx, exportPdf } from "../../lib/exportFile";
 import "./Salaries.css";
 
 const inr = (n) => Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -93,7 +93,7 @@ const PAYSHEET_CSV_COLUMNS = (wd) => [
 
 export default function Salaries() {
   const [month, setMonth] = useState(thisMonth());
-  const [report, setReport] = useState("actual"); // "actual" | "paysheet"
+  const [report, setReport] = useState("actual"); // "actual" | "paysheet" | "adminPaysheet" | "casuals" | "directors"
   const [employees, setEmployees] = useState([]);
   const [attMap, setAttMap] = useState({});
   const [entries, setEntries] = useState({});
@@ -147,13 +147,15 @@ export default function Salaries() {
 
   const merged = (id) => ({ ...(entries[id] || {}), ...(drafts[id] || {}) });
 
+  // Actual and Paysheet salary reports list Workers; the Admin salary paysheet lists Admin Staff (same paysheet logic)
+  const staffCategory = report === "adminPaysheet" ? "Admin Staff" : "Workers";
   const rows = useMemo(() => {
     return employees
-      .filter((e) => e.category === "Workers") // Actual and Paysheet reports are for Workers only
+      .filter((e) => e.category === staffCategory)
       .filter((e) => e.active || (counts[e.id] && Object.values(counts[e.id]).some(Boolean)))
       .map((e) => computeRow({ employee: e, month, counts: counts[e.id], workingDays, payDays: actualDays, entry: { ...(entries[e.id] || {}), ...(drafts[e.id] || {}), otHours: otByEmp[e.id] || 0 } }))
       .sort(byCode);
-  }, [employees, counts, otByEmp, entries, drafts, workingDays, actualDays, month]);
+  }, [employees, counts, otByEmp, entries, drafts, workingDays, actualDays, month, staffCategory]);
 
   const total = (k) => sumRows(rows, k);
 
@@ -223,12 +225,23 @@ export default function Salaries() {
     } catch (e) { fail(e); }
   };
 
-  const exportCsv = () => downloadCsv(
-    `${isDirectors ? "directors-paysheet" : isCasuals ? "casuals-paysheet" : report === "actual" ? "salaries" : "paysheet"}-${month}.csv`,
-    isDirectors ? toCsv(directorRows, DIRECTOR_CSV_COLUMNS)
-      : isCasuals ? toCsv(casualRows, CASUAL_CSV_COLUMNS)
-      : toCsv(rows, report === "actual" ? CSV_COLUMNS(actualDays) : PAYSHEET_CSV_COLUMNS(workingDays)),
-  );
+  // What the Excel / PDF exports contain for the selected report
+  const exportInfo = () => {
+    const name = isDirectors ? "directors-paysheet" : isCasuals ? "casuals-paysheet" : report === "adminPaysheet" ? "admin-paysheet" : report === "actual" ? "salaries" : "paysheet";
+    const title = isDirectors ? "Directors paysheet" : isCasuals ? "Casuals paysheet" : report === "adminPaysheet" ? "Admin salary paysheet" : report === "actual" ? "Actual salary report" : "Paysheet salary report";
+    const columns = isDirectors ? DIRECTOR_CSV_COLUMNS : isCasuals ? CASUAL_CSV_COLUMNS
+      : report === "actual" ? CSV_COLUMNS(actualDays) : PAYSHEET_CSV_COLUMNS(workingDays);
+    const data = isDirectors ? directorRows : isCasuals ? casualRows : rows;
+    return { name, opts: { title, monthText: monthLabel(month), columns, rows: data } };
+  };
+  const exportExcel = async () => {
+    const { name, opts } = exportInfo();
+    try { await exportXlsx(opts, `${name}-${month}.xlsx`); } catch (e) { fail(e); }
+  };
+  const downloadPdf = async () => {
+    const { name, opts } = exportInfo();
+    try { await exportPdf(opts, `${name}-${month}.pdf`); } catch (e) { fail(e); }
+  };
 
   // Casuals OT cell: double-click to edit
   const casualOtCell = (r) => {
@@ -295,6 +308,7 @@ export default function Salaries() {
           <select value={report} onChange={(e) => { setReport(e.target.value); setWdDraft(null); }}>
             <option value="actual">Actual salary report</option>
             <option value="paysheet">Paysheet salary report</option>
+            <option value="adminPaysheet">Admin salary paysheet</option>
             <option value="casuals">Casuals paysheet</option>
             <option value="directors">Directors paysheet</option>
           </select>
@@ -308,8 +322,8 @@ export default function Salaries() {
           </label>
         )}
         {!separate && <button className="btn" onClick={saveDays} disabled={wdDraft === null}>Save</button>}
-        <button className="btn secondary" onClick={() => window.print()} disabled={!(isDirectors ? directorRows : isCasuals ? casualRows : rows).length}>Print paysheet</button>
-        <button className="btn secondary" onClick={exportCsv} disabled={!(isDirectors ? directorRows : isCasuals ? casualRows : rows).length}>Export CSV</button>
+        <button className="btn secondary" onClick={downloadPdf} disabled={!(isDirectors ? directorRows : isCasuals ? casualRows : rows).length}>Download PDF</button>
+        <button className="btn secondary" onClick={exportExcel} disabled={!(isDirectors ? directorRows : isCasuals ? casualRows : rows).length}>Export Excel</button>
       </div>
 
       {!separate && rows.length > 0 && (
@@ -321,7 +335,7 @@ export default function Salaries() {
         </div>
       )}
 
-      <h2 className="print-only">{isDirectors ? `Directors paysheet — ${monthLabel(month)}` : isCasuals ? `Casuals paysheet — ${monthLabel(month)}` : `${report === "actual" ? "Actual salary report" : "Paysheet salary report"} — ${monthLabel(month)} (${isActual ? "days" : "working days"}: ${shownDays})`}</h2>
+      <h2 className="print-only">{isDirectors ? `Directors paysheet — ${monthLabel(month)}` : isCasuals ? `Casuals paysheet — ${monthLabel(month)}` : `${report === "actual" ? "Actual salary report" : report === "adminPaysheet" ? "Admin salary paysheet" : "Paysheet salary report"} — ${monthLabel(month)} (${isActual ? "days" : "working days"}: ${shownDays})`}</h2>
 
       {isDirectors ? (
       <div className="table-wrap">

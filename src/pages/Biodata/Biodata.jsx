@@ -1,5 +1,5 @@
 // pages/Biodata/Biodata.jsx — Unit, Category and Group dropdowns narrow the list;
-// the Employee name dropdown picks the person and shows their biodata.
+// the Employee name dropdown picks the person and shows their details.
 import { useEffect, useMemo, useState } from "react";
 import { listenEmployees } from "../../lib/employees";
 import "./Biodata.css";
@@ -75,7 +75,7 @@ export default function Biodata() {
 
   return (
     <div className="page">
-      <h1 className="no-print">Biodata</h1>
+      <h1 className="no-print">List of employees</h1>
       {error && <div className="msg error no-print">{error}</div>}
 
       <div className="toolbar no-print">
@@ -103,7 +103,7 @@ export default function Biodata() {
             {matching.map((e) => <option key={e.id} value={e.id}>{e.name} ({e.code})</option>)}
           </select>
         </label>
-        <button className="btn secondary" onClick={() => window.print()} disabled={!emp}>Print biodata</button>
+        <button className="btn secondary" onClick={() => window.print()} disabled={!emp}>Print</button>
         {!unit && !category && !group && !empId && (
           <button className="btn" onClick={downloadBlankForm}>Download blank biodata form</button>
         )}
@@ -124,7 +124,7 @@ export default function Biodata() {
             </thead>
             <tbody>
               {matching.map((e) => (
-                <tr key={e.id} style={{ cursor: "pointer" }} title="Click to open this biodata" onClick={() => setEmpId(e.id)}>
+                <tr key={e.id} style={{ cursor: "pointer" }} title="Click to open this employee" onClick={() => setEmpId(e.id)}>
                   <td>{e.code}</td><td>{e.name}</td><td>{dash(e.gender)}</td><td>{dash(e.bloodGroup)}</td><td>{fmtDate(e.dob)}</td>
                   <td>{dash(e.phone)}</td><td>{dash(e.residencePhone)}</td><td>{dash(e.email)}</td>
                   <td>{dash(e.unit)}</td><td>{dash(e.category)}</td><td>{dash(e.group)}</td><td>{dash(e.designation)}</td><td>{fmtDate(e.doj)}</td>

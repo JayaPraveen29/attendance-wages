@@ -38,7 +38,7 @@ export default function NavBar() {
     { to: "/employees", label: "Manage employees", icon: "employees", show: canManageEmployees(profile), end: true },
     { to: "/salaries", label: "Salaries", icon: "salaries", show: canUseSalaries(profile) },
     { to: "/payslip", label: "Payslip", icon: "payslip", show: canUseSalaries(profile) },
-    { to: "/biodata", label: "Biodata", icon: "biodata", show: canManageEmployees(profile) },
+    { to: "/biodata", label: "List of employees", icon: "biodata", show: canManageEmployees(profile) },
     { to: "/approvals", label: "Approvals", icon: "approvals", show: canApprove(profile) },
   ].filter((l) => l.show);
 
