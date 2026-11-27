@@ -4,7 +4,7 @@
 // The doc id makes "one status per employee per day" automatic.
 
 import {
-  collection, doc, setDoc, onSnapshot, query, where, serverTimestamp,
+  collection, doc, setDoc, deleteDoc, onSnapshot, query, where, serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
 
@@ -23,6 +23,11 @@ export function setAttendance(employeeId, date, status, markedBy, ot) {
     },
     { merge: true }
   );
+}
+
+// Unmark: remove the posted attendance for that day (status and any OT hours with it).
+export function clearAttendance(employeeId, date) {
+  return deleteDoc(doc(db, "attendance", `${employeeId}_${date}`));
 }
 
 // Save only the OT hours for a day (workers).

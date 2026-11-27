@@ -2,7 +2,7 @@
 // Workers and Casuals also get an OT (hours) box. With a range, the status / OT you set is applied to every day in it.
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { listenAttendanceDetails, setAttendance, setOvertime, STATUSES } from "../../lib/attendance";
+import { listenAttendanceDetails, setAttendance, setOvertime, clearAttendance, STATUSES } from "../../lib/attendance";
 import { todayStr, dayLabel } from "../../lib/dates";
 
 const MAX_DAYS = 62;
@@ -56,6 +56,18 @@ export default function DayView({ employees }) {
     setBusyId(emp.id);
     setError("");
     try { await Promise.all(dates.map((d) => setAttendance(emp.id, d, status, profile.name))); }
+    catch (e) { setError(e.message); }
+    finally { setBusyId(null); }
+  };
+
+  // Unmark: removes the posted attendance (and its OT) for these dates
+  const unmark = async (emp) => {
+    const posted = dates.filter((d) => rec(emp, d)?.status);
+    if (!posted.length) return;
+    if (posted.length > 1 && !window.confirm(`Remove ${emp.name}'s attendance for ${posted.length} days?`)) return;
+    setBusyId(emp.id);
+    setError("");
+    try { await Promise.all(posted.map((d) => clearAttendance(emp.id, d))); }
     catch (e) { setError(e.message); }
     finally { setBusyId(null); }
   };
@@ -143,6 +155,8 @@ export default function DayView({ employees }) {
                           className={`seg-btn ${cur === s ? "on " + s.replace(" ", "") : ""}`}
                           onClick={() => mark(e, s)}>{s}</button>
                       ))}
+                      <button disabled={busyId === e.id || recs.length === 0} className="seg-btn unmark"
+                        title="Remove the posted attendance" onClick={() => unmark(e)}>Unmark</button>
                     </div>
                     {mixed && <div className="sub" style={{ margin: "4px 0 0" }}>Mixed across these dates</div>}
                   </td>

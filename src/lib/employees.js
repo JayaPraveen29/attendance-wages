@@ -27,7 +27,7 @@ export const EMPTY_EMPLOYEE = {
   monthlySalary: "", daySalary: "",
   gender: "", bloodGroup: "", dob: "", doj: "", designation: "",
   aadhar: "", pan: "",
-  address: "", co: "", houseNo: "", village: "", mandal: "", district: "", state: "", pincode: "",
+  address: "", co: "", houseNo: "", village: "", postOffice: "", policeStation: "", mandal: "", district: "", state: "", pincode: "",
   epf: false, esi: false, // EPF applicable is ticked by hand (it forces EPF even above the 25,000 paysheet limit)
   bankName: "", branchName: "", accountNumber: "", ifsc: "", phone: "", residencePhone: "",
 };
@@ -60,6 +60,8 @@ function clean(f) {
     co: s(f.co),
     houseNo: s(f.houseNo),
     village: s(f.village),
+    postOffice: s(f.postOffice),
+    policeStation: s(f.policeStation),
     mandal: s(f.mandal),
     district: s(f.district),
     state: s(f.state),

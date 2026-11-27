@@ -1,13 +1,12 @@
 // pages/Salaries/Salaries.jsx
 // Monthly payroll sheet. Attendance (from the Attendance page) drives paid days;
-// Advance, EPF and ESI are editable per row. Finalize locks a snapshot of the month.
+// Advance, EPF and ESI are editable per row. The days box has a Save button; the figures always follow live data.
 import { useEffect, useMemo, useState } from "react";
-import { useAuth } from "../../context/AuthContext";
 import { listenEmployees } from "../../lib/employees";
 import { listenAttendanceDetails, countsByEmployee } from "../../lib/attendance";
 import {
   DEFAULT_WORKING_DAYS, PAY_DIVISOR, OT_HOURS_PER_DAY, computeRow, sumRows,
-  listenPayrollMonth, listenEntries, saveEntry, savePayrollMonth, finalizeMonth, reopenMonth,
+  listenPayrollMonth, listenEntries, saveEntry, savePayrollMonth,
 } from "../../lib/payroll";
 import { thisMonth, datesOfMonth, daysInMonth, monthLabel } from "../../lib/dates";
 import { toCsv, downloadCsv } from "../../lib/csv";
@@ -93,7 +92,6 @@ const PAYSHEET_CSV_COLUMNS = (wd) => [
 ];
 
 export default function Salaries() {
-  const { profile } = useAuth();
   const [month, setMonth] = useState(thisMonth());
   const [report, setReport] = useState("actual"); // "actual" | "paysheet"
   const [employees, setEmployees] = useState([]);
@@ -118,7 +116,6 @@ export default function Salaries() {
     return () => { u1(); u2(); u3(); };
   }, [month]);
 
-  const finalized = !!payroll?.finalized;
   // Two separate day counts, each saved on the month's payroll record:
   //   actualDays  - Actual report, defaults to the calendar days of the month (30 / 31 ...)
   //   paysheetDays - Paysheet report, defaults to 26 (month less 4 Sundays); also drives the bank / cash split
@@ -129,7 +126,7 @@ export default function Salaries() {
   const isActual = report === "actual";
   const isCasuals = report === "casuals";
   const isDirectors = report === "directors";
-  const separate = isCasuals || isDirectors; // these two reports have their own tables, no days box / finalize
+  const separate = isCasuals || isDirectors; // these two reports have their own tables, no days box
   const shownDays = isActual ? actualDays : workingDays;
   // attMap: `${employeeId}_${date}` -> { status, ot }
   const counts = useMemo(() => {
@@ -151,13 +148,12 @@ export default function Salaries() {
   const merged = (id) => ({ ...(entries[id] || {}), ...(drafts[id] || {}) });
 
   const rows = useMemo(() => {
-    if (finalized) return payroll.snapshot || [];
     return employees
       .filter((e) => e.category === "Workers") // Actual and Paysheet reports are for Workers only
       .filter((e) => e.active || (counts[e.id] && Object.values(counts[e.id]).some(Boolean)))
       .map((e) => computeRow({ employee: e, month, counts: counts[e.id], workingDays, payDays: actualDays, entry: { ...(entries[e.id] || {}), ...(drafts[e.id] || {}), otHours: otByEmp[e.id] || 0 } }))
       .sort(byCode);
-  }, [employees, counts, otByEmp, entries, drafts, workingDays, actualDays, finalized, payroll, month]);
+  }, [employees, counts, otByEmp, entries, drafts, workingDays, actualDays, month]);
 
   const total = (k) => sumRows(rows, k);
 
@@ -215,28 +211,16 @@ export default function Salaries() {
     } catch (e) { fail(e); }
   };
 
-  const commitWorkingDays = async () => {
+  // Save button: saves the days box for the selected report (Days in month for Actual, Working days for Paysheet)
+  const saveDays = async () => {
     if (wdDraft === null) return;
     const n = Number(wdDraft);
-    setWdDraft(null);
-    if (!(n >= 1 && n <= 31)) return setNotice({ type: "error", text: "Working days must be between 1 and 31." });
-    try { await savePayrollMonth(month, { [isActual ? "actualDays" : "paysheetDays"]: n }); } catch (e) { fail(e); }
-  };
-
-  const finalize = async () => {
-    if (!rows.length) return;
-    if (!window.confirm(`Finalize ${monthLabel(month)}? The figures are frozen as shown. You can still reopen the month later.`)) return;
+    if (!(n >= 1 && n <= 31)) return setNotice({ type: "error", text: "Days must be between 1 and 31." });
     try {
-      await savePayrollMonth(month, { paysheetDays: workingDays, actualDays });
-      await finalizeMonth(month, rows, profile.name);
-      setNotice({ type: "ok", text: `${monthLabel(month)} finalized.` });
+      await savePayrollMonth(month, { [isActual ? "actualDays" : "paysheetDays"]: n });
+      setWdDraft(null);
+      setNotice({ type: "ok", text: `${isActual ? "Days in month" : "Working days"} saved for ${monthLabel(month)}.` });
     } catch (e) { fail(e); }
-  };
-
-  const reopen = async () => {
-    if (!window.confirm(`Reopen the finalized ${monthLabel(month)} for editing? Its frozen figures will be recalculated from live data.`)) return;
-    try { await reopenMonth(month, profile.name); setNotice({ type: "ok", text: "Month reopened for editing." }); }
-    catch (e) { fail(e); }
   };
 
   const exportCsv = () => downloadCsv(
@@ -267,7 +251,6 @@ export default function Salaries() {
   };
 
   const cellInput = (r, k, placeholder) => {
-    if (finalized) return inr(r[k]);
     const live = merged(r.employeeId)[k];
     return (
       <input
@@ -280,8 +263,7 @@ export default function Salaries() {
   };
 
   // ADV / EPF / ESI: double-click to edit
-  const dblCell = (r, k, alwaysEditable = false) => {
-    if (finalized && !alwaysEditable) return inr(r[k]);
+  const dblCell = (r, k) => {
     if (editCell && editCell.id === r.employeeId && editCell.k === k) {
       return (
         <input
@@ -319,26 +301,16 @@ export default function Salaries() {
         </label>
         {!separate && (
           <label className="field">{isActual ? "Days in month" : "Working days"}
-            <input type="number" min="1" max="31" style={{ width: 100 }} disabled={finalized}
+            <input type="number" min="1" max="31" style={{ width: 100 }}
               value={wdDraft ?? shownDays}
-              onChange={(e) => setWdDraft(e.target.value)} onBlur={commitWorkingDays} />
+              onChange={(e) => setWdDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") saveDays(); }} />
           </label>
         )}
-        {!separate && (finalized
-          ? <button className="btn secondary" onClick={reopen}>Edit finalized month</button>
-          : <button className="btn" onClick={finalize} disabled={!rows.length}>Finalize month</button>)}
+        {!separate && <button className="btn" onClick={saveDays} disabled={wdDraft === null}>Save</button>}
         <button className="btn secondary" onClick={() => window.print()} disabled={!(isDirectors ? directorRows : isCasuals ? casualRows : rows).length}>Print paysheet</button>
         <button className="btn secondary" onClick={exportCsv} disabled={!(isDirectors ? directorRows : isCasuals ? casualRows : rows).length}>Export CSV</button>
       </div>
-
-      {!separate && finalized && (
-        <div className="msg warn no-print">
-          Finalized{payroll.finalizedBy ? ` by ${payroll.finalizedBy}` : ""}. Figures are frozen; use “Edit finalized month” to change them.
-        </div>
-      )}
-      {!separate && !finalized && payroll?.editedAfterFinalize && (
-        <div className="msg warn no-print">This month was finalized earlier and reopened by {payroll.reopenedBy || "someone"}. Finalize again when done.</div>
-      )}
 
       {!separate && rows.length > 0 && (
         <div className="stats no-print">
@@ -365,7 +337,7 @@ export default function Salaries() {
               <tr key={r.employeeId}>
                 <td>{r.sno}</td><td>{r.name}</td>
                 <td className="num">{inr(r.income)}</td>
-                <td className="num">{dblCell(r, "tds", true)}</td>
+                <td className="num">{dblCell(r, "tds")}</td>
                 <td className="num"><strong>{inr(r.total)}</strong></td>
               </tr>
             ))}

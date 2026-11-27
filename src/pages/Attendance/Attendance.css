@@ -7,6 +7,8 @@
 .seg-btn.on.Leave { background: var(--steel); color: #fff; }
 .seg-btn.on.Absent { background: var(--error); color: #fff; }
 .seg-btn.on.Holiday { background: #6b4fbb; color: #fff; }
+.seg-btn.unmark { color: var(--error); }
+.seg-btn:disabled { opacity: .5; cursor: default; }
 
 table.grid th, table.grid td { padding: 5px 6px; font-size: 12.5px; }
 table.grid td.cell { text-align: center; font-weight: 700; }

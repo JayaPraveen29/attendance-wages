@@ -2,7 +2,7 @@
 // Workers and Casuals also get an OT (hours) box for each day.
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { listenAttendanceDetails, setAttendance, setOvertime, STATUSES } from "../../lib/attendance";
+import { listenAttendanceDetails, setAttendance, setOvertime, clearAttendance, STATUSES } from "../../lib/attendance";
 import { thisMonth, datesOfMonth, dayLabel, todayStr } from "../../lib/dates";
 
 const MAX_DAYS = 92;
@@ -64,6 +64,14 @@ export default function EmployeeView({ employees }) {
   const mark = async (date, status) => {
     setBusyDate(date); setError("");
     try { await setAttendance(emp.id, date, status, profile.name); }
+    catch (e) { setError(e.message); }
+    finally { setBusyDate(null); }
+  };
+
+  // Unmark: removes the posted attendance (and its OT) for that day
+  const unmark = async (date) => {
+    setBusyDate(date); setError("");
+    try { await clearAttendance(emp.id, date); }
     catch (e) { setError(e.message); }
     finally { setBusyDate(null); }
   };
@@ -131,6 +139,8 @@ export default function EmployeeView({ employees }) {
                               className={`seg-btn ${cur === s ? "on " + s.replace(" ", "") : ""}`}
                               onClick={() => mark(d, s)}>{s}</button>
                           ))}
+                          <button disabled={busyDate === d || !cur} className="seg-btn unmark"
+                            title="Remove the posted attendance" onClick={() => unmark(d)}>Unmark</button>
                         </div>
                       </td>
                       {worker && (
