@@ -18,10 +18,11 @@ const uniq = (list) => [...new Set(list.filter(Boolean))].sort((a, b) => a.local
 
 const inr = (n) => Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
-// Present shown on the sheet = full days + half of each half day (e.g. 20 + 2 half days = 21)
-const presentDays = (r) => r.present + 0.5 * r.halfDay;
-// Actual report: LP = days box (defaults to calendar days in the month) - P - L
-const lpDays = (r, days) => Math.max(0, days - presentDays(r) - r.leave);
+// Present shown on the sheet = full days (incl. Leave sanctioned) + half of each half day + paid holidays
+// (e.g. 20 + 2 half days = 21). A plain Leave is not in P: it goes to loss of pay.
+const presentDays = (r) => r.present + 0.5 * r.halfDay + (r.holiday || 0);
+// Actual report: LP = days box (defaults to calendar days in the month) - P  (leave days are included in LP)
+const lpDays = (r, days) => Math.max(0, days - presentDays(r));
 // Paysheet report: P = the paysheet-calculated days (the "Days" value), L = 0,
 // LP = paysheet days (26 = month less 4 Sundays; the "Working days" box) - P - L
 const paysheetP = (r) => r.bankDays ?? 0;

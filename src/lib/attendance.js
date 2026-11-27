@@ -88,16 +88,16 @@ export function listenAttendanceDetails(startDate, endDate, callback, onError) {
 }
 
 // Count statuses per employee from a listenAttendance map.
-// -> { [employeeId]: { Present, "Half day", Leave, Absent } }
+// -> { [employeeId]: { Present, "Half day", Leave, Absent, Holiday } }
 export function countsByEmployee(map) {
   const out = {};
   for (const [key, status] of Object.entries(map)) {
     const id = key.slice(0, key.lastIndexOf("_"));
-    out[id] = out[id] || { Present: 0, "Half day": 0, Leave: 0, Absent: 0 };
-    // A Holiday is a paid day, so payroll counts it with Leave (the sheet pays P + L).
-    if (status === "Holiday") out[id].Leave += 1;
-    // Leave sanctioned is added to Present (shown as P + LS on the Attendance page)
-    else if (status === LS_STATUS) out[id].Present += 1;
+    out[id] = out[id] || { Present: 0, "Half day": 0, Leave: 0, Absent: 0, Holiday: 0 };
+    // Leave sanctioned is added to Present (shown as P + LS on the Attendance page).
+    // A plain Leave is NOT paid: it falls into loss of pay until it is changed to Leave sanctioned.
+    // A Holiday stays a paid day.
+    if (status === LS_STATUS) out[id].Present += 1;
     else if (status in out[id]) out[id][status] += 1;
   }
   return out;

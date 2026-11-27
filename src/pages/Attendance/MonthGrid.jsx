@@ -2,7 +2,7 @@
 // Totals: P counts a half day as 0.5 (2 H = 1 P), then L, A and OT hours (workers and casuals).
 import { useEffect, useMemo, useState } from "react";
 import { listenAttendanceDetails, STATUS_SHORT, LS_STATUS } from "../../lib/attendance";
-import { thisMonth, datesOfMonth, monthLabel } from "../../lib/dates";
+import { thisMonth, datesOfMonth } from "../../lib/dates";
 
 // 3 -> "3", 2.5 -> "2.5"
 const num = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
@@ -49,11 +49,6 @@ export default function MonthGrid({ employees }) {
           <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
         </label>
       </div>
-      {month && (
-        <p className="sub">
-          {monthLabel(month)} — P present · LS leave sanctioned (counted in P) · H half day · L leave · A absent. In the totals, 2 half days count as 1 P.
-        </p>
-      )}
       {error && <div className="msg error">{error}</div>}
       <div className="table-wrap">
         <table className="data grid">

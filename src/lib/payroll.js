@@ -14,8 +14,9 @@ import { db } from "../firebase";
 // ---------------- rules ----------------
 // These follow the company paysheet (SIEC_WAGES_PAYSHEET_UNIT_II.xlsx):
 //
-//   LP (loss of pay days)  = working days - P - L
-//   Paid days              = P + L                    (P counts a half day as 0.5)
+//   LP (loss of pay days)  = working days - paid days  (a plain Leave is loss of pay, until it is changed to
+//                            Leave sanctioned after the month ends; Leave sanctioned then counts in P)
+//   Paid days              = P + Holiday               (P counts a half day as 0.5, and includes Leave sanctioned)
 //   Salary payable         = ROUND(Actual salary / 30 * paid days, 0)
 //   OT amount              = ROUND(Actual salary / 30 / 8 * OT hours, 0)
 //   Total                  = Salary payable + OT, rounded to nearest 10
@@ -39,8 +40,9 @@ export const PAY_DIVISOR = 30;
 export const OT_HOURS_PER_DAY = 8;
 const roundTo10 = (n) => Math.round(n / 10) * 10;
 
-// Approved "Leave" counts as a paid day (the sheet pays P + L).
-export const LEAVE_IS_PAID = true;
+// A plain "Leave" is NOT paid: it counts as loss of pay. Once it is changed to "Leave sanctioned"
+// it is added to Present and paid.
+export const LEAVE_IS_PAID = false;
 
 export const EPF_RATE = 0.12;
 // EPF wage ceiling: 15,000 up to Aug 2026, 25,000 from Sep 2026 (as in the paysheet).
@@ -74,7 +76,7 @@ const num = (v) => (v === "" || v == null || isNaN(Number(v)) ? 0 : Number(v));
 
 // payDays = the "Days in month" box of the Actual report: the divisor for salary and OT (defaults to 30).
 export function computeRow({ employee, counts, workingDays, payDays, entry, month }) {
-  const c = counts || { Present: 0, "Half day": 0, Leave: 0, Absent: 0 };
+  const c = counts || { Present: 0, "Half day": 0, Leave: 0, Absent: 0, Holiday: 0 };
   const e = entry || {};
   // gross = Actual Salary (shown as is). paysheetSalary = Paysheet salary, which only PT is calculated on (earned salary and OT use gross / Actual Salary).
   const gross = num(employee.actualSalary) > 0 ? num(employee.actualSalary) : num(employee.grossSalary);
@@ -83,9 +85,10 @@ export function computeRow({ employee, counts, workingDays, payDays, entry, mont
   const divisor = Math.max(1, num(payDays) || PAY_DIVISOR);   // days the salary is divided by
 
   const p = c.Present + 0.5 * c["Half day"];                 // P
-  const l = c.Leave;                                         // L
-  const lp = Math.max(0, wd - p - l);                        // LP
-  const paidDays = p + (LEAVE_IS_PAID ? l : 0);              // Paid (not capped: salary is per day on a 30-day month)
+  const l = c.Leave;                                         // L (unpaid, so it falls into LP)
+  const hol = c.Holiday || 0;                                // Holiday (paid)
+  const paidDays = p + hol + (LEAVE_IS_PAID ? l : 0);        // Paid (not capped: salary is per day on a 30-day month)
+  const lp = Math.max(0, wd - paidDays);                     // LP = working days - paid days (leave is included)
 
   // Salary payable, whole rupees (same order of operations as the sheet: Gross / days * paid)
   const earned = Math.round((gross / divisor) * paidDays);   // Salary payable, on Actual Salary
@@ -122,7 +125,7 @@ export function computeRow({ employee, counts, workingDays, payDays, entry, mont
     accountNumber: employee.accountNumber || "",
     ifsc: employee.ifsc || "",
     gross, paysheetSalary,
-    present: c.Present, halfDay: c["Half day"], leave: l, absent: c.Absent, lp,
+    present: c.Present, halfDay: c["Half day"], leave: l, holiday: hol, absent: c.Absent, lp,
     paidDays, earned, otHours, otAmt, hra, epf, esi, pt, ptOverridden, advance,
     totalEarnings, totalDeductions,
     perDay: r2(perDay), bankDays, bankGross, bank, cash,

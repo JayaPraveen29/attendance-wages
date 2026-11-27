@@ -30,7 +30,7 @@ export default function MyAttendance({ employees }) {
 
   const today = todayStr();
   const todayStatus = map[`${me.id}_${today}`];
-  const counts = countsByEmployee(map)[me.id] || { Present: 0, "Half day": 0, Leave: 0, Absent: 0 };
+  const counts = countsByEmployee(map)[me.id] || { Present: 0, "Half day": 0, Leave: 0, Absent: 0, Holiday: 0 };
   const days = month ? datesOfMonth(month) : [];
 
   const markToday = async () => {
@@ -63,7 +63,7 @@ export default function MyAttendance({ employees }) {
       </div>
       {month && (
         <p className="sub">
-          {monthLabel(month)} — Present {counts.Present} · Half day {counts["Half day"]} · Leave {counts.Leave} · Absent {counts.Absent}
+          {monthLabel(month)} — Present {counts.Present} · Half day {counts["Half day"]} · Leave {counts.Leave} · Holiday {counts.Holiday} · Absent {counts.Absent}
         </p>
       )}
       <div className="table-wrap">
