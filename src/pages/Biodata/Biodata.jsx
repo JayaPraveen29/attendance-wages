@@ -2,6 +2,7 @@
 // the Employee name dropdown picks the person and shows their details.
 import { useEffect, useMemo, useState } from "react";
 import { listenEmployees } from "../../lib/employees";
+import StaffFilters, { NO_FILTER, matchesFilter, noFilterChosen } from "../../components/StaffFilters";
 import "./Biodata.css";
 
 const dash = (v) => (v === undefined || v === null || v === "" ? "—" : v);
@@ -10,7 +11,6 @@ const fmtAadhar = (v) => {
   const d = String(v || "").replace(/\D/g, "").slice(0, 12);
   return d ? d.replace(/(\d{4})(?=\d)/g, "$1 ") : "";
 };
-const uniq = (list) => [...new Set(list.filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
 const address = (e) => [e.co, e.houseNo, e.village, e.postOffice, e.policeStation, e.mandal, e.district, e.state, e.pincode]
   .filter(Boolean).join(", ");
@@ -55,48 +55,22 @@ function Section({ title, children }) {
 
 export default function Biodata() {
   const [employees, setEmployees] = useState([]);
-  const [unit, setUnit] = useState("");
-  const [category, setCategory] = useState("");
-  const [group, setGroup] = useState("");
+  const [filters, setFilters] = useState(NO_FILTER); // Group / Unit / Category
   const [empId, setEmpId] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => listenEmployees(setEmployees, (e) => setError(e.message)), []);
 
-  const matching = useMemo(
-    () => employees.filter((e) => (!unit || e.unit === unit) && (!category || e.category === category) && (!group || e.group === group)),
-    [employees, unit, category, group]
-  );
+  const matching = useMemo(() => employees.filter((e) => matchesFilter(e, filters)), [employees, filters]);
   const emp = matching.find((e) => e.id === empId);
-
-  const units = uniq(employees.map((e) => e.unit));
-  const categories = uniq(employees.map((e) => e.category));
-  const groups = uniq(employees.map((e) => e.group));
 
   return (
     <div className="page">
       <h1 className="no-print">List of employees</h1>
       {error && <div className="msg error no-print">{error}</div>}
 
-      <div className="toolbar no-print">
-        <label className="field">Unit
-          <select value={unit} onChange={(e) => { setUnit(e.target.value); setEmpId(""); }}>
-            <option value="">All units</option>
-            {units.map((u) => <option key={u} value={u}>{u}</option>)}
-          </select>
-        </label>
-        <label className="field">Category
-          <select value={category} onChange={(e) => { setCategory(e.target.value); setEmpId(""); }}>
-            <option value="">All categories</option>
-            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </label>
-        <label className="field">Group
-          <select value={group} onChange={(e) => { setGroup(e.target.value); setEmpId(""); }}>
-            <option value="">All groups</option>
-            {groups.map((g) => <option key={g} value={g}>{g}</option>)}
-          </select>
-        </label>
+      <div className="toolbar no-print sticky-bar">
+        <StaffFilters employees={employees} value={filters} onChange={(v) => { setFilters(v); setEmpId(""); }} />
         <label className="field">Employee name
           <select value={empId} onChange={(e) => setEmpId(e.target.value)} style={{ minWidth: 260 }}>
             <option value="">Select an employee…</option>
@@ -104,7 +78,7 @@ export default function Biodata() {
           </select>
         </label>
         <button className="btn secondary" onClick={() => window.print()} disabled={!emp}>Print</button>
-        {!unit && !category && !group && !empId && (
+        {noFilterChosen(filters) && !empId && (
           <button className="btn" onClick={downloadBlankForm}>Download blank biodata form</button>
         )}
       </div>

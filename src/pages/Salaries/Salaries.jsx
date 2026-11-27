@@ -10,6 +10,7 @@ import {
 } from "../../lib/payroll";
 import { thisMonth, datesOfMonth, daysInMonth, monthLabel } from "../../lib/dates";
 import { exportXlsx, exportPdf } from "../../lib/exportFile";
+import StaffFilters, { NO_FILTER, matchesFilter } from "../../components/StaffFilters";
 import "./Salaries.css";
 
 const inr = (n) => Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -100,7 +101,8 @@ const PAYSHEET_CSV_COLUMNS = (wd) => [
 export default function Salaries() {
   const [month, setMonth] = useState(thisMonth());
   const [report, setReport] = useState("actual"); // "actual" | "paysheet" | "adminPaysheet" | "fieldPaysheet" | "casuals" | "directors"
-  const [employees, setEmployees] = useState([]);
+  const [allEmployees, setAllEmployees] = useState([]);
+  const [filters, setFilters] = useState(NO_FILTER); // Group / Unit / Category
   const [attMap, setAttMap] = useState({});
   const [entries, setEntries] = useState({});
   const [payroll, setPayroll] = useState(null);
@@ -111,7 +113,8 @@ export default function Salaries() {
 
   const fail = (e) => setNotice({ type: "error", text: e.message });
 
-  useEffect(() => listenEmployees(setEmployees, fail), []);
+  useEffect(() => listenEmployees(setAllEmployees, fail), []);
+  const employees = useMemo(() => allEmployees.filter((e) => matchesFilter(e, filters)), [allEmployees, filters]);
   useEffect(() => {
     if (!month) return undefined;
     setDrafts({}); setWdDraft(null);
@@ -320,6 +323,7 @@ export default function Salaries() {
             <option value="directors">Directors paysheet</option>
           </select>
         </label>
+        <StaffFilters employees={allEmployees} value={filters} onChange={setFilters} />
         {!separate && (
           <label className="field">{isActual ? "Days in month" : "Working days"}
             <input type="number" min="1" max="31" style={{ width: 100 }}
