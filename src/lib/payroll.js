@@ -21,7 +21,8 @@ import { db } from "../firebase";
 //   Total                  = Salary payable + OT, rounded to nearest 10
 //   PT                     = by Paysheet salary slab (editable per row)
 //   EPF                    = 12% of Salary payable (Bank gross), if Paysheet salary is 25,000 or less,
-//                            or if "EPF applicable" is ticked on the employee (even above 25,000)
+//                            or if "EPF applicable" is ticked on the employee (even above 25,000).
+//                            Admin Staff / Field Staff: calculated on 25,000 at most (EPF_STAFF_CAP)
 //   ESI                    = 0.75% of Salary payable (Bank gross), only if Paysheet salary is 21,000 or less
 //
 //   Bank / Cash split:
@@ -50,6 +51,10 @@ export const epfCapFor = (month) => (!month || month >= EPF_NEW_CAP_FROM ? EPF_W
 
 // EPF applies only when the Paysheet salary is up to this; above it no EPF is deducted.
 export const EPF_PAYSHEET_LIMIT = 25000;
+// Admin Staff and Field Staff: EPF is never worked out on more than this, even if their salary payable is higher
+// (so the most they pay is 12% of 25,000 = 3,000).
+export const EPF_STAFF_CAP = 25000;
+const CAPPED_EPF_CATEGORIES = ["Admin Staff", "Field Staff"];
 // ESI applies only when the Paysheet salary is up to this.
 export const ESI_PAYSHEET_LIMIT = 21000;
 export const ESI_RATE = 0.0075;         // 0.75% employee share
@@ -100,7 +105,8 @@ export function computeRow({ employee, counts, workingDays, payDays, entry, mont
   const bankGross = Math.round(perDay * bankDays);
   // EPF / ESI are worked out on Salary payable (= Bank gross), depending on the Paysheet salary
   const epfApplies = paysheetSalary <= EPF_PAYSHEET_LIMIT || employee.epf === true;
-  const epf = epfApplies ? Math.round(bankGross * EPF_RATE) : 0;
+  const epfBase = CAPPED_EPF_CATEGORIES.includes(employee.category) ? Math.min(bankGross, EPF_STAFF_CAP) : bankGross;
+  const epf = epfApplies ? Math.round(epfBase * EPF_RATE) : 0;
   const esi = paysheetSalary <= ESI_PAYSHEET_LIMIT ? Math.round(bankGross * ESI_RATE) : 0;
   const bank = r2(bankGross - pt - epf - esi);                // Bank = Bank gross - PT - EPF - ESI
   const cash = roundTo10(totalEarnings - bankGross - advance); // Cash = Total - Bank gross - Adv, nearest 10 (EPF / ESI already come off the bank amount)

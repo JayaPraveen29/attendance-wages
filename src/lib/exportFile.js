@@ -64,8 +64,9 @@ export async function makePdf({ title, monthText, columns, rows }) {
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const margin = 10;
+  const topMargin = 28; // landscape sheets are filed along the top edge, so start lower
 
-  let y = 12;
+  let y = topMargin;
   headingLines({ title, monthText }).forEach((line, i) => {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(i === 0 ? 14 : 11);
@@ -83,7 +84,7 @@ export async function makePdf({ title, monthText, columns, rows }) {
     foot: [totalsRow(cols, rows).map(show)],
     showFoot: "lastPage",
     theme: "grid",
-    margin: { left: margin, right: margin, top: 10, bottom: 10 },
+    margin: { left: margin, right: margin, top: topMargin, bottom: 10 },
     styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.6, lineColor: [0, 0, 0], lineWidth: 0.2, textColor: [0, 0, 0], overflow: "linebreak" },
     headStyles: { fillColor: [232, 238, 234], textColor: [0, 0, 0], fontStyle: "bold" },
     footStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: "bold" },

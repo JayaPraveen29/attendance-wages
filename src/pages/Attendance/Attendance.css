@@ -7,6 +7,7 @@
 .seg-btn.on.Leave { background: var(--steel); color: #fff; }
 .seg-btn.on.Absent { background: var(--error); color: #fff; }
 .seg-btn.on.Holiday { background: #6b4fbb; color: #fff; }
+.seg-btn.on.Leavesanctioned { background: #1f7a8c; color: #fff; }
 .seg-btn.unmark { color: var(--error); }
 .seg-btn:disabled { opacity: .5; cursor: default; }
 
@@ -17,4 +18,5 @@ td.cell.Halfday { background: #fff4d6; color: var(--warn); }
 td.cell.Leave { background: #e8ecf1; color: var(--steel); }
 td.cell.Absent { background: #fdecea; color: var(--error); }
 td.cell.Holiday { background: #eee9fa; color: #6b4fbb; }
+td.cell.Leavesanctioned { background: #e0f2f5; color: #1f7a8c; }
 tr.today-row td { background: #fffaf0; }

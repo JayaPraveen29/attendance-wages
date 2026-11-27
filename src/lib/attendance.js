@@ -8,9 +8,14 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 
-export const STATUSES = ["Present", "Half day", "Leave", "Absent", "Holiday"];
-export const STATUS_SHORT = { Present: "P", "Half day": "H", Leave: "L", Absent: "A", Holiday: "HD" };
-export const STATUS_BADGE = { Present: "green", "Half day": "amber", Leave: "grey", Absent: "red", Holiday: "amber" };
+export const LS_STATUS = "Leave sanctioned";
+export const STATUSES = ["Present", "Half day", "Leave", "Absent", "Holiday", LS_STATUS];
+export const STATUS_SHORT = { Present: "P", "Half day": "H", Leave: "L", Absent: "A", Holiday: "HD", [LS_STATUS]: "LS" };
+export const STATUS_BADGE = { Present: "green", "Half day": "amber", Leave: "grey", Absent: "red", Holiday: "amber", [LS_STATUS]: "green" };
+
+// Workers and Casuals get an OT box; everyone else also gets "Leave sanctioned" (counted as Present).
+export const isWorkerCategory = (e) => e?.category === "Workers" || e?.category === "Casuals";
+export const statusesFor = (e) => (isWorkerCategory(e) ? STATUSES.filter((s) => s !== LS_STATUS) : STATUSES);
 
 // merge:true so changing the status keeps an OT value already saved for that day.
 // ot (hours) is optional and only used for workers.
@@ -91,6 +96,8 @@ export function countsByEmployee(map) {
     out[id] = out[id] || { Present: 0, "Half day": 0, Leave: 0, Absent: 0 };
     // A Holiday is a paid day, so payroll counts it with Leave (the sheet pays P + L).
     if (status === "Holiday") out[id].Leave += 1;
+    // Leave sanctioned is added to Present (shown as P + LS on the Attendance page)
+    else if (status === LS_STATUS) out[id].Present += 1;
     else if (status in out[id]) out[id][status] += 1;
   }
   return out;

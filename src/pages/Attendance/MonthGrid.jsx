@@ -1,11 +1,17 @@
 // Month grid: one row per employee, one column per day (P / H / L / A).
 // Totals: P counts a half day as 0.5 (2 H = 1 P), then L, A and OT hours (workers and casuals).
 import { useEffect, useMemo, useState } from "react";
-import { listenAttendanceDetails, STATUS_SHORT } from "../../lib/attendance";
+import { listenAttendanceDetails, STATUS_SHORT, LS_STATUS } from "../../lib/attendance";
 import { thisMonth, datesOfMonth, monthLabel } from "../../lib/dates";
 
 // 3 -> "3", 2.5 -> "2.5"
 const num = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+
+// "2026-11-27" -> "Fri" (3-letter day name shown above the date)
+const dayName = (d) => {
+  const [y, m, day] = d.split("-").map(Number);
+  return new Date(y, m - 1, day).toLocaleDateString("en-US", { weekday: "short" });
+};
 
 export default function MonthGrid({ employees }) {
   const [month, setMonth] = useState(thisMonth());
@@ -27,7 +33,7 @@ export default function MonthGrid({ employees }) {
     for (const [key, r] of Object.entries(map)) {
       const id = key.slice(0, key.lastIndexOf("_"));
       const t = (out[id] = out[id] || { present: 0, leave: 0, absent: 0, ot: 0 });
-      if (r.status === "Present") t.present += 1;
+      if (r.status === "Present" || r.status === LS_STATUS) t.present += 1; // Leave sanctioned counts as present
       else if (r.status === "Half day") t.present += 0.5;
       else if (r.status === "Leave") t.leave += 1;
       else if (r.status === "Absent") t.absent += 1;
@@ -45,7 +51,7 @@ export default function MonthGrid({ employees }) {
       </div>
       {month && (
         <p className="sub">
-          {monthLabel(month)} — P present · H half day · L leave · A absent. In the totals, 2 half days count as 1 P.
+          {monthLabel(month)} — P present · LS leave sanctioned (counted in P) · H half day · L leave · A absent. In the totals, 2 half days count as 1 P.
         </p>
       )}
       {error && <div className="msg error">{error}</div>}
@@ -53,9 +59,13 @@ export default function MonthGrid({ employees }) {
         <table className="data grid">
           <thead>
             <tr>
-              <th>Name</th>
+              <th rowSpan={2}>Name</th>
+              {days.map((d) => <th key={d} className="num">{dayName(d)}</th>)}
+              <th rowSpan={2} className="num">P</th><th rowSpan={2} className="num">L</th>
+              <th rowSpan={2} className="num">A</th><th rowSpan={2} className="num">OT</th>
+            </tr>
+            <tr>
               {days.map((d) => <th key={d} className="num">{Number(d.slice(8))}</th>)}
-              <th className="num">P</th><th className="num">L</th><th className="num">A</th><th className="num">OT</th>
             </tr>
           </thead>
           <tbody>

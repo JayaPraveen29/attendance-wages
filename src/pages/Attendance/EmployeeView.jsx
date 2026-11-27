@@ -2,7 +2,7 @@
 // Workers and Casuals also get an OT (hours) box for each day.
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { listenAttendanceDetails, setAttendance, setOvertime, clearAttendance, STATUSES } from "../../lib/attendance";
+import { listenAttendanceDetails, setAttendance, setOvertime, clearAttendance, LS_STATUS, statusesFor } from "../../lib/attendance";
 import { thisMonth, datesOfMonth, dayLabel, todayStr } from "../../lib/dates";
 
 const MAX_DAYS = 92;
@@ -47,7 +47,7 @@ export default function EmployeeView({ employees }) {
   }, [days, tooLong]);
 
   const rec = (d) => (emp ? map[`${emp.id}_${d}`] : undefined);
-  const counts = { Present: 0, "Half day": 0, Leave: 0, Absent: 0 };
+  const counts = { Present: 0, "Half day": 0, Leave: 0, Absent: 0, [LS_STATUS]: 0 };
   let otTotal = 0;
   if (emp) {
     for (const d of days) {
@@ -133,7 +133,10 @@ export default function EmployeeView({ employees }) {
             {days.length > 0 && !tooLong && <> — {dayLabel(days[0])}{days.length > 1 && <> to {dayLabel(days[days.length - 1])}</>} · {days.length} day{days.length > 1 ? "s" : ""}</>}
           </p>
           <div className="stats">
-            <div className="stat present"><div className="label">Present</div><div className="value">{counts.Present}</div></div>
+            <div className="stat present">
+              <div className="label">{worker ? "Present" : "P + LS"}</div>
+              <div className="value">{worker ? counts.Present : `${counts.Present} + ${counts[LS_STATUS]}`}</div>
+            </div>
             <div className="stat half"><div className="label">Half day</div><div className="value">{counts["Half day"]}</div></div>
             <div className="stat leave"><div className="label">Leave</div><div className="value">{counts.Leave}</div></div>
             <div className="stat absent"><div className="label">Absent</div><div className="value">{counts.Absent}</div></div>
@@ -151,7 +154,7 @@ export default function EmployeeView({ employees }) {
                       <td>{dayLabel(d)}{d === today && <> <span className="badge amber">Today</span></>}</td>
                       <td>
                         <div className="seg">
-                          {STATUSES.map((s) => (
+                          {statusesFor(emp).map((s) => (
                             <button key={s} disabled={busyDate === d}
                               className={`seg-btn ${cur === s ? "on " + s.replace(" ", "") : ""}`}
                               onClick={() => mark(d, s)}>{s}</button>

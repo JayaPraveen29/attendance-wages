@@ -84,7 +84,7 @@ export function validateEmployee(f, list, exceptId = null) {
   if (s(f.email) && !/^\S+@\S+\.\S+$/.test(s(f.email))) return "Email looks wrong.";
   if (!(Number(f.grossSalary) > 0)) return "Salary must be greater than 0.";
   if (s(f.phone) && !/^\+?[0-9 -]{7,15}$/.test(s(f.phone))) return "Phone number looks wrong.";
-  if (s(f.residencePhone) && !/^\+?[0-9 -]{7,15}$/.test(s(f.residencePhone))) return "Residency phone number looks wrong.";
+  if (s(f.residencePhone) && !/^\+?[0-9 -]{7,15}$/.test(s(f.residencePhone))) return "Resi. Phone looks wrong.";
   if (s(f.pincode) && !/^[1-9][0-9]{5}$/.test(s(f.pincode))) return "Pincode must be a valid 6-digit number.";
   const code = s(f.code).toUpperCase();
   if (list.some((e) => e.id !== exceptId && (e.code || "").toUpperCase() === code)) {

@@ -8,7 +8,7 @@
 .bio-label { font-size: 12.5px; color: var(--text-muted); margin-bottom: 2px; }
 .bio-value { font-size: 15px; font-weight: 600; word-break: break-word; }
 @media print {
-  @page { size: A4 portrait; margin: 12mm; }
+  @page { size: A4 portrait; margin: 12mm 12mm 12mm 28mm; } /* extra left margin for filing */
   .sidebar, .mobile-header, .mobile-drawer, .mobile-menu-overlay, .no-print { display: none !important; }
   body { background: #fff; }
   .page { padding: 0; }

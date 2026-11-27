@@ -269,7 +269,7 @@ export default function EmployeeForm({ initial, existing = [], exceptId, submitL
           </>
         )}
         <label className="field">Phone<input value={f.phone} onChange={set("phone")} inputMode="tel" /></label>
-        <label className="field">Residency phone number<input value={f.residencePhone || ""} onChange={set("residencePhone")} inputMode="tel" /></label>
+        <label className="field">Resi. Phone<input value={f.residencePhone || ""} onChange={set("residencePhone")} inputMode="tel" /></label>
 
         {/* Address, split into parts */}
         <label className="field">C/o<input value={f.co} onChange={set("co")}  /></label>
