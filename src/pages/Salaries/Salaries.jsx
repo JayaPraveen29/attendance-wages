@@ -52,6 +52,12 @@ const CSV_COLUMNS = (days) => [
   { header: "IFSC", value: (r) => r.ifsc },
 ];
 
+// Extra paysheet reports that work exactly like the Paysheet salary report, for another staff category
+const STAFF_REPORTS = {
+  adminPaysheet: { category: "Admin Staff", title: "Admin salary paysheet", file: "admin-paysheet" },
+  fieldPaysheet: { category: "Field Staff", title: "Field salary paysheet", file: "field-paysheet" },
+};
+
 // Casuals paysheet: S.No, Name, Rate, Days, OT, D.Amt, OT Amt, Total
 const CASUAL_CSV_COLUMNS = [
   { header: "S.No", value: (r) => r.sno },
@@ -93,7 +99,7 @@ const PAYSHEET_CSV_COLUMNS = (wd) => [
 
 export default function Salaries() {
   const [month, setMonth] = useState(thisMonth());
-  const [report, setReport] = useState("actual"); // "actual" | "paysheet" | "adminPaysheet" | "casuals" | "directors"
+  const [report, setReport] = useState("actual"); // "actual" | "paysheet" | "adminPaysheet" | "fieldPaysheet" | "casuals" | "directors"
   const [employees, setEmployees] = useState([]);
   const [attMap, setAttMap] = useState({});
   const [entries, setEntries] = useState({});
@@ -147,8 +153,8 @@ export default function Salaries() {
 
   const merged = (id) => ({ ...(entries[id] || {}), ...(drafts[id] || {}) });
 
-  // Actual and Paysheet salary reports list Workers; the Admin salary paysheet lists Admin Staff (same paysheet logic)
-  const staffCategory = report === "adminPaysheet" ? "Admin Staff" : "Workers";
+  // Actual and Paysheet salary reports list Workers; the Admin / Field salary paysheets list Admin Staff / Field Staff (same paysheet logic)
+  const staffCategory = STAFF_REPORTS[report]?.category || "Workers";
   const rows = useMemo(() => {
     return employees
       .filter((e) => e.category === staffCategory)
@@ -227,8 +233,8 @@ export default function Salaries() {
 
   // What the Excel / PDF exports contain for the selected report
   const exportInfo = () => {
-    const name = isDirectors ? "directors-paysheet" : isCasuals ? "casuals-paysheet" : report === "adminPaysheet" ? "admin-paysheet" : report === "actual" ? "salaries" : "paysheet";
-    const title = isDirectors ? "Directors paysheet" : isCasuals ? "Casuals paysheet" : report === "adminPaysheet" ? "Admin salary paysheet" : report === "actual" ? "Actual salary report" : "Paysheet salary report";
+    const name = isDirectors ? "directors-paysheet" : isCasuals ? "casuals-paysheet" : STAFF_REPORTS[report] ? STAFF_REPORTS[report].file : report === "actual" ? "salaries" : "paysheet";
+    const title = isDirectors ? "Directors paysheet" : isCasuals ? "Casuals paysheet" : STAFF_REPORTS[report] ? STAFF_REPORTS[report].title : report === "actual" ? "Actual salary report" : "Paysheet salary report";
     const columns = isDirectors ? DIRECTOR_CSV_COLUMNS : isCasuals ? CASUAL_CSV_COLUMNS
       : report === "actual" ? CSV_COLUMNS(actualDays) : PAYSHEET_CSV_COLUMNS(workingDays);
     const data = isDirectors ? directorRows : isCasuals ? casualRows : rows;
@@ -309,6 +315,7 @@ export default function Salaries() {
             <option value="actual">Actual salary report</option>
             <option value="paysheet">Paysheet salary report</option>
             <option value="adminPaysheet">Admin salary paysheet</option>
+            <option value="fieldPaysheet">Field salary paysheet</option>
             <option value="casuals">Casuals paysheet</option>
             <option value="directors">Directors paysheet</option>
           </select>
@@ -335,7 +342,7 @@ export default function Salaries() {
         </div>
       )}
 
-      <h2 className="print-only">{isDirectors ? `Directors paysheet — ${monthLabel(month)}` : isCasuals ? `Casuals paysheet — ${monthLabel(month)}` : `${report === "actual" ? "Actual salary report" : report === "adminPaysheet" ? "Admin salary paysheet" : "Paysheet salary report"} — ${monthLabel(month)} (${isActual ? "days" : "working days"}: ${shownDays})`}</h2>
+      <h2 className="print-only">{isDirectors ? `Directors paysheet — ${monthLabel(month)}` : isCasuals ? `Casuals paysheet — ${monthLabel(month)}` : `${report === "actual" ? "Actual salary report" : STAFF_REPORTS[report] ? STAFF_REPORTS[report].title : "Paysheet salary report"} — ${monthLabel(month)} (${isActual ? "days" : "working days"}: ${shownDays})`}</h2>
 
       {isDirectors ? (
       <div className="table-wrap">
