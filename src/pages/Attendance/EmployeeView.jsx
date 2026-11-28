@@ -57,6 +57,9 @@ export default function EmployeeView({ employees }) {
   }
   // LP = days in the range that are not paid: range days - P - leave - holidays (same rule as the Salaries page)
   const pDays = counts.Present + 0.5 * counts["Half day"] + 0.5 * counts["HD Leave"];
+  // "P + LS" card: P = Present + half of each Half day; LS = Leave sanctioned + half of each H.d leave sanctioned
+  const pOnly = counts.Present + 0.5 * counts["Half day"];
+  const lsPart = counts.LS + 0.5 * counts["HD Leave"];
   const lpDays = Math.max(0, days.length - pDays - (usesLeaveSanctioned(emp) ? counts.LS : counts.Leave + counts.LS) - counts.Holiday);
   const today = todayStr();
 
@@ -119,7 +122,7 @@ export default function EmployeeView({ employees }) {
             {days.length > 0 && !tooLong && <> — {dayLabel(days[0])}{days.length > 1 && <> to {dayLabel(days[days.length - 1])}</>} · {days.length} day{days.length > 1 ? "s" : ""}</>}
           </p>
           <div className="stats">
-            <div className="stat present"><div className="label">{usesLeaveSanctioned(emp) ? "P + LS" : "Present"}</div><div className="value">{usesLeaveSanctioned(emp) ? `${pDays} + ${counts.LS} = ${pDays + counts.LS}` : pDays}</div></div>
+            <div className="stat present"><div className="label">{usesLeaveSanctioned(emp) ? "P + LS" : "Present"}</div><div className="value">{usesLeaveSanctioned(emp) ? `${pOnly} + ${lsPart} = ${pOnly + lsPart}` : pDays}</div></div>
             <div className="stat half"><div className="label">Half day</div><div className="value">{counts["Half day"]}</div></div>
             {usesLeaveSanctioned(emp) && <div className="stat half"><div className="label">H.d leave sanctioned</div><div className="value">{counts["HD Leave"]}</div></div>}
             <div className="stat leave"><div className="label">Leave</div><div className="value">{counts.Leave}</div></div>
