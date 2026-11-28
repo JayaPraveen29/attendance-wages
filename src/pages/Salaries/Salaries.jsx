@@ -24,7 +24,7 @@ const lpDays = (r, days) => Math.max(0, days - presentDays(r) - r.leave);
 const paysheetP = (r) => r.bankDays ?? 0;
 const paysheetLp = (r, wd) => Math.max(0, wd - paysheetP(r));
 // Admin / Field paysheets: P = days present (attendance), LS = leave sanctioned, LP = working days - P - LS
-// (an "H.d leave sanctioned" day is 0.5 in P and its other 0.5 lands in LP)
+// (an "H.d leave sanctioned" day is 0.5 in P and 0.5 in LS, so nothing lands in LP; r.leave already includes that 0.5)
 const staffLp = (r, wd) => Math.max(0, wd - presentDays(r) - r.leave);
 // Paysheet report: total deductions = the EPF + ESI + PT columns shown on that sheet
 const paysheetDeductions = (r) => (Number(r.epf) || 0) + (Number(r.esi) || 0) + (Number(r.pt) || 0);

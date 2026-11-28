@@ -14,7 +14,7 @@ import { db } from "../firebase";
 // ---------------- rules ----------------
 // These follow the company paysheet (SIEC_WAGES_PAYSHEET_UNIT_II.xlsx):
 //
-//   LP (loss of pay days)  = working days - P - L
+//   LP (loss of pay days)  = working days - P - L   (an H.d leave sanctioned day = 0.5 in P + 0.5 in L, nothing in LP)
 //   Paid days              = P + L                    (P counts a half day as 0.5)
 //   Salary payable         = ROUND(Actual salary / 30 * paid days, 0)
 //   OT amount              = ROUND(Actual salary / 30 / 8 * OT hours, 0)
@@ -77,11 +77,12 @@ export function computeRow({ employee, counts, workingDays, payDays, entry, mont
   const wd = Math.max(1, num(workingDays));
   const divisor = Math.max(1, num(payDays) || PAY_DIVISOR);   // days the salary is divided by
 
-  const hdLeave = c["HD Leave"] || 0;                        // H.d leave sanctioned (Admin / Field staff): 0.5 day present, 0.5 day LP
+  const hdLeave = c["HD Leave"] || 0;                        // H.d leave sanctioned (Admin / Field staff): 0.5 day present, 0.5 day sanctioned leave (not LP)
   const p = c.Present + 0.5 * c["Half day"] + 0.5 * hdLeave; // P
   // Only "Leave sanctioned" (LS) and Holiday are paid leave. A plain "Leave" is not paid: it falls in LP
   // (for every category).
-  const l = (c.LS || 0) + (c.Holiday || 0);                  // L
+  // The sanctioned half of an H.d leave sanctioned day is paid leave too, so it is NOT added to LP.
+  const l = (c.LS || 0) + (c.Holiday || 0) + 0.5 * hdLeave; // L
   const lp = Math.max(0, wd - p - l);                        // LP
   const paidDays = p + (LEAVE_IS_PAID ? l : 0);              // Paid (not capped: salary is per day on a 30-day month)
 
