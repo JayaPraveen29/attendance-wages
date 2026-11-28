@@ -104,9 +104,8 @@ export function countsByEmployee(map) {
   for (const [key, status] of Object.entries(map)) {
     const id = key.slice(0, key.lastIndexOf("_"));
     out[id] = out[id] || { Present: 0, "Half day": 0, "HD Leave": 0, LS: 0, Holiday: 0, Leave: 0, Absent: 0 };
-    // A Holiday is a paid day, so payroll counts it with Leave (the sheet pays P + L).
-    if (status === "Holiday") { out[id].Leave += 1; out[id].Holiday += 1; }
-    else if (status in out[id]) out[id][status] += 1;
+    // Holiday is counted on its own only: it is not added to P, Leave / LS, or paid days.
+    if (status in out[id]) out[id][status] += 1;
   }
   return out;
 }

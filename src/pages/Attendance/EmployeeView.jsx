@@ -61,7 +61,7 @@ export default function EmployeeView({ employees }) {
   // "P + LS" card: P = Present + half of each Half day; LS = Leave sanctioned + half of each H.d leave sanctioned
   const pOnly = counts.Present + 0.5 * counts["Half day"];
   const lsPart = counts.LS + 0.5 * counts["HD Leave"];
-  const lpDays = Math.max(0, days.length - pDays - (usesLeaveSanctioned(emp) ? counts.LS : counts.Leave + counts.LS) - counts.Holiday - 0.5 * counts["HD Leave"]);
+  const lpDays = Math.max(0, days.length - pDays - (usesLeaveSanctioned(emp) ? counts.LS : counts.Leave + counts.LS) - 0.5 * counts["HD Leave"]);
   const today = todayStr();
 
   // From can never be after To

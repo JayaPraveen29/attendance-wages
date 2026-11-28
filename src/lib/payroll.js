@@ -10,6 +10,7 @@ import {
   collection, doc, setDoc, onSnapshot, query, where, serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { usesLeaveSanctioned } from "./attendance";
 
 // ---------------- rules ----------------
 // These follow the company paysheet (SIEC_WAGES_PAYSHEET_UNIT_II.xlsx):
@@ -17,10 +18,11 @@ import { db } from "../firebase";
 //   LP (loss of pay days)  = working days - P - L   (an H.d leave sanctioned day = 0.5 in P + 0.5 in L, nothing in LP)
 //   Paid days              = P + L                    (P counts a half day as 0.5)
 //   Salary payable         = ROUND(Actual salary / 30 * paid days, 0)
+//                            (Admin / Field staff: ROUND(Paysheet salary / working days * paid days, 0), they have no Actual salary)
 //   OT amount              = ROUND(Actual salary / 30 / 8 * OT hours, 0)
 //   Total                  = Salary payable + OT, rounded to nearest 10
 //   PT                     = by Paysheet salary slab (editable per row)
-//   EPF                    = 12% of Salary payable (Bank gross), if Paysheet salary is 25,000 or less,
+//   EPF                    = 12% of Paysheet salary, capped at the 25,000 wage ceiling (max 3,000), if Paysheet salary is 25,000 or less,
 //                            or if "EPF applicable" is ticked on the employee (even above 25,000)
 //   ESI                    = 0.75% of Salary payable (Bank gross), only if Paysheet salary is 21,000 or less
 //
@@ -79,15 +81,21 @@ export function computeRow({ employee, counts, workingDays, payDays, entry, mont
 
   const hdLeave = c["HD Leave"] || 0;                        // H.d leave sanctioned (Admin / Field staff): 0.5 day present, 0.5 day sanctioned leave (not LP)
   const p = c.Present + 0.5 * c["Half day"] + 0.5 * hdLeave; // P
-  // Only "Leave sanctioned" (LS) and Holiday are paid leave. A plain "Leave" is not paid: it falls in LP
+  // Only "Leave sanctioned" (LS) is paid leave (Holiday counts for nothing). A plain "Leave" is not paid: it falls in LP
   // (for every category).
   // The sanctioned half of an H.d leave sanctioned day is paid leave too, so it is NOT added to LP.
-  const l = (c.LS || 0) + (c.Holiday || 0) + 0.5 * hdLeave; // L
+  const l = (c.LS || 0) + 0.5 * hdLeave;                    // L (Holiday counts for nothing)
   const lp = Math.max(0, wd - p - l);                        // LP
+  const lsShown = (c.LS || 0) + 0.5 * hdLeave;               // LS column: leave sanctioned + the sanctioned half of H.d leave (holidays are not shown here)
   const paidDays = p + (LEAVE_IS_PAID ? l : 0);              // Paid (not capped: salary is per day on a 30-day month)
 
   // Salary payable, whole rupees (same order of operations as the sheet: Gross / days * paid)
-  const earned = Math.round((gross / divisor) * paidDays);   // Salary payable, on Actual Salary
+  // Admin / Field staff have no Actual salary: Salary payable = Paysheet salary / working days * paid days.
+  // Everyone else: Actual salary / days in month * paid days.
+  const isStaff = usesLeaveSanctioned(employee);
+  const earned = isStaff
+    ? Math.round((paysheetSalary / wd) * paidDays)
+    : Math.round((gross / divisor) * paidDays);              // Salary payable, on Actual Salary
   const otHours = num(e.otHours);
   const otAmt = Math.round((gross / divisor / OT_HOURS_PER_DAY) * otHours); // OT is on Actual Salary
   const hra = 0; // HRA column removed from the sheet
@@ -103,10 +111,13 @@ export function computeRow({ employee, counts, workingDays, payDays, entry, mont
   const bankDays = perDay > 0 ? Math.floor((totalEarnings / perDay) * 2 + 1e-9) / 2 : 0; // down to nearest 0.5
   // Salary payable can be typed over by hand (entry.salaryPayable > 0); 0 / empty = automatic
   const payableOverridden = num(e.salaryPayable) > 0;
-  const bankGross = payableOverridden ? Math.round(num(e.salaryPayable)) : Math.round(perDay * bankDays);
-  // EPF / ESI are worked out on Salary payable (= Bank gross), depending on the Paysheet salary
+  const bankGross = payableOverridden ? Math.round(num(e.salaryPayable))
+    : isStaff ? earned                                        // Admin / Field staff: no bank-days rounding
+    : Math.round(perDay * bankDays);
+  // ESI is worked out on Salary payable (= Bank gross); EPF on the Paysheet salary (capped at 25,000)
   const epfApplies = paysheetSalary <= EPF_PAYSHEET_LIMIT || employee.epf === true;
-  const epf = epfApplies ? Math.round(bankGross * EPF_RATE) : 0;
+  // EPF is worked out on the Paysheet salary (not on Salary payable), capped at the wage ceiling (25,000 from Sep 2026).
+  const epf = epfApplies ? Math.round(Math.min(paysheetSalary, epfCapFor(month)) * EPF_RATE) : 0;
   const esi = paysheetSalary <= ESI_PAYSHEET_LIMIT ? Math.round(bankGross * ESI_RATE) : 0;
   const bank = r2(bankGross - pt - epf - esi);                // Bank = Bank gross - PT - EPF - ESI
   const cash = roundTo10(totalEarnings - bankGross - advance); // Cash = Total - Bank gross - Adv, nearest 10 (EPF / ESI already come off the bank amount)
@@ -122,7 +133,7 @@ export function computeRow({ employee, counts, workingDays, payDays, entry, mont
     accountNumber: employee.accountNumber || "",
     ifsc: employee.ifsc || "",
     gross, paysheetSalary,
-    present: c.Present, halfDay: c["Half day"], hdLeave, leave: l, absent: c.Absent, lp,
+    present: c.Present, halfDay: c["Half day"], hdLeave, leave: l, ls: lsShown, absent: c.Absent, lp,
     paidDays, earned, otHours, otAmt, hra, epf, esi, pt, ptOverridden, advance,
     totalEarnings, totalDeductions,
     perDay: r2(perDay), bankDays, bankGross, payableOverridden, bank, cash,

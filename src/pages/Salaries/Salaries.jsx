@@ -86,7 +86,7 @@ const DIRECTOR_CSV_COLUMNS = [
 // Admin / Field paysheet: same as the Paysheet report but P / LS / LP come from attendance
 const STAFF_PAYSHEET_CSV_COLUMNS = (wd) => PAYSHEET_CSV_COLUMNS(wd).map((c) =>
   c.header === "P" ? { header: "P", value: (r) => presentDays(r) }
-    : c.header === "L" ? { header: "LS", value: (r) => r.leave }
+    : c.header === "L" ? { header: "LS", value: (r) => r.ls ?? r.leave }
     : c.header === "LP" ? { header: "LP", value: (r) => staffLp(r, wd) }
     : c);
 
@@ -530,7 +530,7 @@ export default function Salaries() {
               <tr key={r.employeeId}>
                 <td>{r.code}</td><td>{r.name}</td>
                 <td className="num">{isStaffReport ? presentDays(r) : paysheetP(r)}</td>
-                <td className="num">{isStaffReport ? r.leave : 0}</td>
+                <td className="num">{isStaffReport ? (r.ls ?? r.leave) : 0}</td>
                 <td className="num">{isStaffReport ? staffLp(r, workingDays) : paysheetLp(r, workingDays)}</td>
                 <td className="num">{inr(r.paysheetSalary)}</td>
                 <td className="num">{isStaffReport ? payableCell(r) : r.bankGross !== undefined ? inr(r.bankGross) : "-"}</td>
