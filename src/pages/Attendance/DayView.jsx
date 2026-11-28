@@ -2,7 +2,7 @@
 // Workers and Casuals also get an OT (hours) box. With a range, the status / OT you set is applied to every day in it.
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { listenAttendanceDetails, setAttendance, setOvertime, clearAttendance, STATUSES, LS_STATUS, statusesFor } from "../../lib/attendance";
+import { listenAttendanceDetails, setAttendance, setOvertime, clearAttendance, STATUSES, HD_LEAVE, LEAVE_SANCTIONED, statusesFor, statusLabel, usesLeaveSanctioned } from "../../lib/attendance";
 import { todayStr, dayLabel } from "../../lib/dates";
 
 const MAX_DAYS = 62;
@@ -96,10 +96,15 @@ export default function DayView({ employees }) {
   };
 
   // Totals are counted in employee-days (for a single date this is just employees).
-  const countOf = (s) => active.reduce((n, e) => n + dates.filter((d) => rec(e, d)?.status === s).length, 0);
-  const lsCount = countOf(LS_STATUS);
-  // Leave sanctioned is part of the Present box, shown as "P + LS"
-  const summary = STATUSES.filter((s) => s !== LS_STATUS).map((s) => [s, countOf(s)]);
+  const rawSummary = [...STATUSES, HD_LEAVE, LEAVE_SANCTIONED].map((s) => [
+    s, active.reduce((n, e) => n + dates.filter((d) => rec(e, d)?.status === s).length, 0),
+  ]);
+  // Present also gets 0.5 for every Half day and every H.d leave sanctioned day
+  const cnt = (k) => rawSummary.find(([s]) => s === k)[1];
+  const summary = rawSummary
+    .map(([s, n]) => [s, s === "Present" ? n + 0.5 * cnt("Half day") + 0.5 * cnt(HD_LEAVE) : n])
+    .filter(([s, n]) => s === HD_LEAVE ? n > 0 : s !== LEAVE_SANCTIONED); // H.d leave sanctioned card only shows when used; LS is shown inside "P + LS"
+  const showLs = active.some(usesLeaveSanctioned); // Admin / Field staff: Present card reads "P + LS"
   const unmarked = active.length * dates.length -
     active.reduce((n, e) => n + dates.filter((d) => rec(e, d)?.status).length, 0);
 
@@ -126,9 +131,9 @@ export default function DayView({ employees }) {
       {tooLong && <div className="msg error">Please pick a range of up to {MAX_DAYS} days.</div>}
       <div className="stats">
         {summary.map(([s, n]) => (
-          <div key={s} className={`stat ${{ Present: "present", "Half day": "half", Leave: "leave", Absent: "absent", Holiday: "holiday" }[s]}`}>
-            <div className="label">{s === "Present" ? "P + LS" : s}</div>
-            <div className="value">{s === "Present" ? `${n} + ${lsCount}` : n}</div>
+          <div key={s} className={`stat ${{ Present: "present", "Half day": "half", "HD Leave": "half", LS: "leave", Leave: "leave", Absent: "absent", Holiday: "holiday" }[s]}`}>
+            <div className="label">{s === "Present" && showLs ? "P + LS" : statusLabel(s)}</div>
+            <div className="value">{s === "Present" && showLs ? `${n} + ${cnt(LEAVE_SANCTIONED)}` : n}</div>
           </div>
         ))}
         <div className="stat"><div className="label">Not marked yet</div><div className="value">{unmarked}</div></div>
@@ -155,7 +160,7 @@ export default function DayView({ employees }) {
                       {statusesFor(e).map((s) => (
                         <button key={s} disabled={busyId === e.id}
                           className={`seg-btn ${cur === s ? "on " + s.replace(" ", "") : ""}`}
-                          onClick={() => mark(e, s)}>{s}</button>
+                          onClick={() => mark(e, s)}>{statusLabel(s, e)}</button>
                       ))}
                       <button disabled={busyId === e.id || recs.length === 0} className="seg-btn unmark"
                         title="Remove the posted attendance" onClick={() => unmark(e)}>Unmark</button>

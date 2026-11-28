@@ -10,23 +10,22 @@ import {
 } from "../../lib/payroll";
 import { thisMonth, datesOfMonth, daysInMonth, monthLabel } from "../../lib/dates";
 import { exportXlsx, exportPdf } from "../../lib/exportFile";
-import { NO_FILTER, matchesFilter } from "../../components/StaffFilters";
+import StaffFilters, { NO_FILTER, matchesFilter } from "../../components/StaffFilters";
 import "./Salaries.css";
-
-// unique, sorted dropdown values
-const uniq = (list) => [...new Set(list.filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
 const inr = (n) => Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
-// Present shown on the sheet = full days (incl. Leave sanctioned) + half of each half day + paid holidays
-// (e.g. 20 + 2 half days = 21). A plain Leave is not in P: it goes to loss of pay.
-const presentDays = (r) => r.present + 0.5 * r.halfDay + (r.holiday || 0);
-// Actual report: LP = days box (defaults to calendar days in the month) - P  (leave days are included in LP)
-const lpDays = (r, days) => Math.max(0, days - presentDays(r));
+// Present shown on the sheet = full days + half of each half day (e.g. 20 + 2 half days = 21)
+const presentDays = (r) => r.present + 0.5 * r.halfDay + 0.5 * (r.hdLeave || 0);
+// Actual report: LP = days box (defaults to calendar days in the month) - P - L
+const lpDays = (r, days) => Math.max(0, days - presentDays(r) - r.leave);
 // Paysheet report: P = the paysheet-calculated days (the "Days" value), L = 0,
 // LP = paysheet days (26 = month less 4 Sundays; the "Working days" box) - P - L
 const paysheetP = (r) => r.bankDays ?? 0;
 const paysheetLp = (r, wd) => Math.max(0, wd - paysheetP(r));
+// Admin / Field paysheets: P = days present (attendance), LS = leave sanctioned, LP = working days - P - LS
+// (an "H.d leave sanctioned" day is 0.5 in P and its other 0.5 lands in LP)
+const staffLp = (r, wd) => Math.max(0, wd - presentDays(r) - r.leave);
 // Paysheet report: total deductions = the EPF + ESI + PT columns shown on that sheet
 const paysheetDeductions = (r) => (Number(r.epf) || 0) + (Number(r.esi) || 0) + (Number(r.pt) || 0);
 
@@ -84,6 +83,13 @@ const DIRECTOR_CSV_COLUMNS = [
   { header: "Total", value: (r) => r.total },
 ];
 
+// Admin / Field paysheet: same as the Paysheet report but P / LS / LP come from attendance
+const STAFF_PAYSHEET_CSV_COLUMNS = (wd) => PAYSHEET_CSV_COLUMNS(wd).map((c) =>
+  c.header === "P" ? { header: "P", value: (r) => presentDays(r) }
+    : c.header === "L" ? { header: "LS", value: (r) => r.leave }
+    : c.header === "LP" ? { header: "LP", value: (r) => staffLp(r, wd) }
+    : c);
+
 const PAYSHEET_CSV_COLUMNS = (wd) => [
   { header: "Emp ID", value: (r) => r.code },
   { header: "Name", value: (r) => r.name },
@@ -106,7 +112,7 @@ export default function Salaries() {
   const [month, setMonth] = useState(thisMonth());
   const [report, setReport] = useState("actual"); // "actual" | "paysheet" | "adminPaysheet" | "fieldPaysheet" | "casuals" | "directors"
   const [allEmployees, setAllEmployees] = useState([]);
-  const [filters, setFilters] = useState(NO_FILTER); // Group / Unit (category comes from the selected report)
+  const [filters, setFilters] = useState(NO_FILTER); // Group / Unit / Category
   const [attMap, setAttMap] = useState({});
   const [entries, setEntries] = useState({});
   const [payroll, setPayroll] = useState(null);
@@ -139,6 +145,7 @@ export default function Salaries() {
   const isActual = report === "actual";
   const isCasuals = report === "casuals";
   const isDirectors = report === "directors";
+  const isStaffReport = !!STAFF_REPORTS[report]; // Admin / Field paysheet
   const separate = isCasuals || isDirectors; // these two reports have their own tables, no days box
   const shownDays = isActual ? actualDays : workingDays;
   // attMap: `${employeeId}_${date}` -> { status, ot }
@@ -243,9 +250,10 @@ export default function Salaries() {
     const name = isDirectors ? "directors-paysheet" : isCasuals ? "casuals-paysheet" : STAFF_REPORTS[report] ? STAFF_REPORTS[report].file : report === "actual" ? "salaries" : "paysheet";
     const title = isDirectors ? "Directors paysheet" : isCasuals ? "Casuals paysheet" : STAFF_REPORTS[report] ? STAFF_REPORTS[report].title : report === "actual" ? "Actual salary report" : "Paysheet salary report";
     const columns = isDirectors ? DIRECTOR_CSV_COLUMNS : isCasuals ? CASUAL_CSV_COLUMNS
+      : isStaffReport ? STAFF_PAYSHEET_CSV_COLUMNS(workingDays)
       : report === "actual" ? CSV_COLUMNS(actualDays) : PAYSHEET_CSV_COLUMNS(workingDays);
     const data = isDirectors ? directorRows : isCasuals ? casualRows : rows;
-    return { name, opts: { title, monthText: monthLabel(month), columns, rows: data } };
+    return { name, opts: { title, monthText: monthLabel(month), group: filters.group || "All", unit: filters.unit || "All", columns, rows: data } };
   };
   const exportExcel = async () => {
     const { name, opts } = exportInfo();
@@ -308,6 +316,26 @@ export default function Salaries() {
     );
   };
 
+  // Salary payable (Admin / Field paysheets): double-click to type your own amount; 0 / empty goes back to automatic
+  const payableCell = (r) => {
+    if (editCell && editCell.id === r.employeeId && editCell.k === "salaryPayable") {
+      return (
+        <input
+          className="cell-input" type="number" min="0" step="1" autoFocus placeholder={String(r.bankGross)}
+          value={merged(r.employeeId).salaryPayable ?? ""}
+          onChange={(e) => setDraft(r.employeeId, "salaryPayable", e.target.value)}
+          onBlur={() => { commit(r.employeeId, "salaryPayable"); setEditCell(null); }}
+          onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+        />
+      );
+    }
+    return (
+      <span className="adv-cell" title="Double-click to edit" onDoubleClick={() => setEditCell({ id: r.employeeId, k: "salaryPayable" })}>
+        {inr(r.bankGross)}
+      </span>
+    );
+  };
+
   return (
     <div className="page">
       <h1 className="no-print">Salaries</h1>
@@ -327,18 +355,7 @@ export default function Salaries() {
             <option value="directors">Directors paysheet</option>
           </select>
         </label>
-        <label className="field">Group
-          <select className="staff-filter" value={filters.group} onChange={(e) => setFilters({ ...filters, group: e.target.value })}>
-            <option value="">All groups</option>
-            {uniq(allEmployees.map((e) => e.group)).map((g) => <option key={g} value={g}>{g}</option>)}
-          </select>
-        </label>
-        <label className="field">Unit
-          <select className="staff-filter" value={filters.unit} onChange={(e) => setFilters({ ...filters, unit: e.target.value })}>
-            <option value="">All units</option>
-            {uniq(allEmployees.map((e) => e.unit)).map((u) => <option key={u} value={u}>{u}</option>)}
-          </select>
-        </label>
+        <StaffFilters employees={allEmployees} value={filters} onChange={setFilters} />
         {!separate && (
           <label className="field">{isActual ? "Days in month" : "Working days"}
             <input type="number" min="1" max="31" style={{ width: 100 }}
@@ -360,6 +377,11 @@ export default function Salaries() {
           <div className="stat net"><div className="label">Net payout</div><div className="value">₹{inr(total("net"))}</div></div>
         </div>
       )}
+
+      {/* table header: which Group and Unit this table is for */}
+      <div style={{ margin: "6px 0 12px", fontWeight: 600, color: "var(--navy)" }}>
+        Group: {filters.group || "All"} &nbsp;·&nbsp; Unit: {filters.unit || "All"}
+      </div>
 
       <h2 className="print-only">{isDirectors ? `Directors paysheet — ${monthLabel(month)}` : isCasuals ? `Casuals paysheet — ${monthLabel(month)}` : `${report === "actual" ? "Actual salary report" : STAFF_REPORTS[report] ? STAFF_REPORTS[report].title : "Paysheet salary report"} — ${monthLabel(month)} (${isActual ? "days" : "working days"}: ${shownDays})`}</h2>
 
@@ -496,7 +518,7 @@ export default function Salaries() {
           <thead>
             <tr>
               <th>Emp ID</th><th>Name</th>
-              <th className="num">P</th><th className="num">L</th><th className="num">LP</th>
+              <th className="num">P</th><th className="num">{isStaffReport ? "LS" : "L"}</th><th className="num">LP</th>
               <th className="num">Paysheet salary</th><th className="num">Salary payable</th>
               <th className="num">EPF</th><th className="num">ESI</th><th className="num">PT</th>
               <th className="num">Total deductions</th>
@@ -507,11 +529,11 @@ export default function Salaries() {
             {rows.map((r) => (
               <tr key={r.employeeId}>
                 <td>{r.code}</td><td>{r.name}</td>
-                <td className="num">{paysheetP(r)}</td>
-                <td className="num">0</td>
-                <td className="num">{paysheetLp(r, workingDays)}</td>
+                <td className="num">{isStaffReport ? presentDays(r) : paysheetP(r)}</td>
+                <td className="num">{isStaffReport ? r.leave : 0}</td>
+                <td className="num">{isStaffReport ? staffLp(r, workingDays) : paysheetLp(r, workingDays)}</td>
                 <td className="num">{inr(r.paysheetSalary)}</td>
-                <td className="num">{r.bankGross !== undefined ? inr(r.bankGross) : "-"}</td>
+                <td className="num">{isStaffReport ? payableCell(r) : r.bankGross !== undefined ? inr(r.bankGross) : "-"}</td>
                 <td className="num">{inr(r.epf)}</td>
                 <td className="num">{inr(r.esi)}</td>
                 <td className="num">{inr(r.pt)}</td>

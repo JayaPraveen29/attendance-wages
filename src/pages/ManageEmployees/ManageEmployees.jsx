@@ -48,6 +48,7 @@ export default function ManageEmployees() {
   const [viewing, setViewing] = useState(null);
   const [editing, setEditing] = useState(null);
   const [notice, setNotice] = useState({ type: "", text: "" });
+  const [selectedIds, setSelectedIds] = useState([]); // ticked rows
 
   useEffect(
     () => listenEmployees(setEmployees, (e) => setNotice({ type: "error", text: e.message })),
@@ -80,10 +81,33 @@ export default function ManageEmployees() {
     catch (e) { setNotice({ type: "error", text: e.message }); }
   };
 
-  const remove = (e) => {
-    if (!window.confirm(`Delete ${e.name}? This also removes their attendance and payroll entries and cannot be undone.\n\nTip: use Deactivate to keep history.`)) return;
+  // ---- tick boxes + the action bar above the table ----
+  const selected = rows.filter((e) => selectedIds.includes(e.id)); // only rows that are still visible
+  const one = selected.length === 1 ? selected[0] : null;
+  const allTicked = rows.length > 0 && selected.length === rows.length;
+  const toggle = (id) => setSelectedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  const toggleAll = () => setSelectedIds(allTicked ? [] : rows.map((e) => e.id));
+  const anyActive = selected.some((e) => e.active);
+
+  const toggleActive = () => {
+    const targets = anyActive ? selected.filter((e) => e.active) : selected;
+    const makeActive = !anyActive;
+    run(
+      () => Promise.all(targets.map((e) => setEmployeeActive(e.id, makeActive))),
+      targets.length === 1
+        ? `${targets[0].name} is now ${makeActive ? "active" : "inactive"}.`
+        : `${targets.length} employees are now ${makeActive ? "active" : "inactive"}.`
+    );
+  };
+
+  const removeSelected = () => {
+    if (!selected.length) return;
+    const what = selected.length === 1 ? selected[0].name : `${selected.length} employees`;
+    if (!window.confirm(`Delete ${what}? This also removes their attendance and payroll entries and cannot be undone.\n\nTip: use Deactivate to keep history.`)) return;
     setViewing(null);
-    run(() => deleteEmployee(e.id), `${e.name} was deleted.`);
+    const ids = selected.map((e) => e.id);
+    run(() => Promise.all(ids.map((id) => deleteEmployee(id))), `${what} ${selected.length === 1 ? "was" : "were"} deleted.`)
+      .then(() => setSelectedIds((cur) => cur.filter((id) => !ids.includes(id))));
   };
 
   // keep the open detail dialog in sync with live data
@@ -124,17 +148,32 @@ export default function ManageEmployees() {
         </label>
       </div>
 
+      {/* actions for the ticked rows; blanked out until a row is ticked */}
+      <div className="toolbar" style={{ marginBottom: 10 }}>
+        <button className="btn small" disabled={!one} onClick={() => setViewing(one)}>View</button>
+        <button className="btn small secondary" disabled={!one} onClick={() => setEditing(one)}>Edit</button>
+        <button className="btn small secondary" disabled={!selected.length} onClick={toggleActive}>
+          {selected.length && !anyActive ? "Activate" : "Deactivate"}
+        </button>
+        <button className="btn small danger" disabled={!selected.length} onClick={removeSelected}>Delete</button>
+        <span style={{ color: "var(--text-muted)", fontSize: 14 }}>
+          {selected.length ? `${selected.length} selected` : "Tick a row to use these options"}
+        </span>
+      </div>
+
       <div className="table-wrap">
         <table className="data">
           <thead>
             <tr>
+              <th style={{ width: 36 }}><input type="checkbox" checked={allTicked} onChange={toggleAll} aria-label="Select all" /></th>
               <th>Employee ID</th><th>Name</th><th>Group</th><th>Unit</th><th>Category</th><th>Designation</th><th>Phone</th><th>Email</th>
-              <th className="num">Salary ₹</th><th className="num">Paysheet ₹</th><th className="num">PT ₹</th><th>EPF</th><th>ESI</th><th>OT</th><th>Status</th><th>Actions</th>
+              <th className="num">Salary ₹</th><th className="num">Paysheet ₹</th><th className="num">PT ₹</th><th>EPF</th><th>ESI</th><th>OT</th><th>Status</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((e) => (
-              <tr key={e.id}>
+              <tr key={e.id} style={selectedIds.includes(e.id) ? { background: "#eef5f1" } : undefined}>
+                <td><input type="checkbox" checked={selectedIds.includes(e.id)} onChange={() => toggle(e.id)} aria-label={`Select ${e.name}`} /></td>
                 <td>{e.code}</td>
                 <td><strong>{e.name}</strong></td>
                 <td>{dash(e.group)}</td>
@@ -149,16 +188,6 @@ export default function ManageEmployees() {
                 <td>{e.epf ? "Yes" : "No"}</td><td>{e.esi ? "Yes" : "No"}</td>
                 <td>{isWorker(e) ? (e.otApplicable === false ? "No" : "Yes") : "—"}</td>
                 <td><span className={`badge ${e.active ? "green" : "grey"}`}>{e.active ? "Active" : "Inactive"}</span></td>
-                <td>
-                  <div className="toolbar" style={{ margin: 0 }}>
-                    <button className="btn small" onClick={() => setViewing(e)}>View</button>
-                    <button className="btn small secondary" onClick={() => setEditing(e)}>Edit</button>
-                    <button className="btn small secondary" onClick={() => run(() => setEmployeeActive(e.id, !e.active), `${e.name} is now ${e.active ? "inactive" : "active"}.`)}>
-                      {e.active ? "Deactivate" : "Activate"}
-                    </button>
-                    <button className="btn small danger" onClick={() => remove(e)}>Delete</button>
-                  </div>
-                </td>
               </tr>
             ))}
             {rows.length === 0 && <tr><td colSpan={16} className="empty">No employees match. Try a different search or filter.</td></tr>}

@@ -2,7 +2,7 @@
 // Workers and Casuals also get an OT (hours) box for each day.
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { listenAttendanceDetails, setAttendance, setOvertime, clearAttendance, LS_STATUS, statusesFor } from "../../lib/attendance";
+import { listenAttendanceDetails, setAttendance, setOvertime, clearAttendance, statusesFor, statusLabel, usesLeaveSanctioned } from "../../lib/attendance";
 import { thisMonth, datesOfMonth, dayLabel, todayStr } from "../../lib/dates";
 
 const MAX_DAYS = 92;
@@ -31,7 +31,6 @@ export default function EmployeeView({ employees }) {
   const [otDraft, setOtDraft] = useState({}); // date -> text being typed
   const [error, setError] = useState("");
   const [busyDate, setBusyDate] = useState(null);
-  const [bulkBusy, setBulkBusy] = useState(false);
 
   const active = useMemo(() => employees.filter((e) => e.active), [employees]);
   const emp = employees.find((e) => e.id === empId);
@@ -47,7 +46,7 @@ export default function EmployeeView({ employees }) {
   }, [days, tooLong]);
 
   const rec = (d) => (emp ? map[`${emp.id}_${d}`] : undefined);
-  const counts = { Present: 0, "Half day": 0, Leave: 0, Absent: 0, [LS_STATUS]: 0 };
+  const counts = { Present: 0, "Half day": 0, "HD Leave": 0, LS: 0, Leave: 0, Absent: 0, Holiday: 0 };
   let otTotal = 0;
   if (emp) {
     for (const d of days) {
@@ -56,6 +55,9 @@ export default function EmployeeView({ employees }) {
       if (r?.status) otTotal += r.ot || 0;
     }
   }
+  // LP = days in the range that are not paid: range days - P - leave - holidays (same rule as the Salaries page)
+  const pDays = counts.Present + 0.5 * counts["Half day"] + 0.5 * counts["HD Leave"];
+  const lpDays = Math.max(0, days.length - pDays - (usesLeaveSanctioned(emp) ? counts.LS : counts.Leave + counts.LS) - counts.Holiday);
   const today = todayStr();
 
   // From can never be after To
@@ -75,17 +77,6 @@ export default function EmployeeView({ employees }) {
     try { await clearAttendance(emp.id, date); }
     catch (e) { setError(e.message); }
     finally { setBusyDate(null); }
-  };
-
-  // Mark every unmarked day in the From–To range as Present (days already marked are left alone)
-  const unmarkedDays = emp && !tooLong ? days.filter((d) => !rec(d)?.status) : [];
-  const markAllUnmarkedPresent = async () => {
-    if (!emp || !unmarkedDays.length) return;
-    if (!window.confirm(`Mark ${unmarkedDays.length} unmarked day(s) as Present for ${emp.name}?`)) return;
-    setError(""); setBulkBusy(true);
-    try { await Promise.all(unmarkedDays.map((d) => setAttendance(emp.id, d, "Present", profile.name))); }
-    catch (e) { setError(e.message); }
-    finally { setBulkBusy(false); }
   };
 
   const saveOt = async (date) => {
@@ -115,11 +106,6 @@ export default function EmployeeView({ employees }) {
         <label className="field">To date
           <input type="date" value={to} min={from} onChange={(e) => changeTo(e.target.value)} />
         </label>
-        <button className="btn secondary" onClick={markAllUnmarkedPresent}
-          disabled={!emp || tooLong || bulkBusy || unmarkedDays.length === 0}
-          title={emp ? "Mark every unmarked day in this range as Present" : "Select an employee first"}>
-          Mark all unmarked Present
-        </button>
       </div>
       {tooLong && <div className="msg error">Please pick a range of up to {MAX_DAYS} days.</div>}
       {error && <div className="msg error">{error}</div>}
@@ -133,13 +119,12 @@ export default function EmployeeView({ employees }) {
             {days.length > 0 && !tooLong && <> — {dayLabel(days[0])}{days.length > 1 && <> to {dayLabel(days[days.length - 1])}</>} · {days.length} day{days.length > 1 ? "s" : ""}</>}
           </p>
           <div className="stats">
-            <div className="stat present">
-              <div className="label">{worker ? "Present" : "P + LS"}</div>
-              <div className="value">{worker ? counts.Present : `${counts.Present} + ${counts[LS_STATUS]}`}</div>
-            </div>
+            <div className="stat present"><div className="label">{usesLeaveSanctioned(emp) ? "P + LS" : "Present"}</div><div className="value">{usesLeaveSanctioned(emp) ? `${pDays} + ${counts.LS}` : pDays}</div></div>
             <div className="stat half"><div className="label">Half day</div><div className="value">{counts["Half day"]}</div></div>
+            {usesLeaveSanctioned(emp) && <div className="stat half"><div className="label">H.d leave sanctioned</div><div className="value">{counts["HD Leave"]}</div></div>}
             <div className="stat leave"><div className="label">Leave</div><div className="value">{counts.Leave}</div></div>
             <div className="stat absent"><div className="label">Absent</div><div className="value">{counts.Absent}</div></div>
+            <div className="stat absent"><div className="label">LP</div><div className="value">{lpDays}</div></div>
             {worker && <div className="stat"><div className="label">OT hours</div><div className="value">{otTotal}</div></div>}
           </div>
           <div className="table-wrap">
@@ -157,7 +142,7 @@ export default function EmployeeView({ employees }) {
                           {statusesFor(emp).map((s) => (
                             <button key={s} disabled={busyDate === d}
                               className={`seg-btn ${cur === s ? "on " + s.replace(" ", "") : ""}`}
-                              onClick={() => mark(d, s)}>{s}</button>
+                              onClick={() => mark(d, s)}>{statusLabel(s, emp)}</button>
                           ))}
                           <button disabled={busyDate === d || !cur} className="seg-btn unmark"
                             title="Remove the posted attendance" onClick={() => unmark(d)}>Unmark</button>

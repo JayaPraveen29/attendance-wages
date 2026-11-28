@@ -8,14 +8,22 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 
-export const LS_STATUS = "Leave sanctioned";
-export const STATUSES = ["Present", "Half day", "Leave", "Absent", "Holiday", LS_STATUS];
-export const STATUS_SHORT = { Present: "P", "Half day": "H", Leave: "L", Absent: "A", Holiday: "HD", [LS_STATUS]: "LS" };
-export const STATUS_BADGE = { Present: "green", "Half day": "amber", Leave: "grey", Absent: "red", Holiday: "amber", [LS_STATUS]: "green" };
+export const STATUSES = ["Present", "Half day", "Leave", "Absent", "Holiday"];
+export const STATUS_SHORT = { Present: "P", "Half day": "H", "HD Leave": "HL", LS: "LS", Leave: "L", Absent: "A", Holiday: "HD" };
+export const STATUS_BADGE = { Present: "green", "Half day": "amber", "HD Leave": "amber", LS: "grey", Leave: "grey", Absent: "red", Holiday: "amber" };
 
-// Workers and Casuals get an OT box; everyone else also gets "Leave sanctioned" (counted as Present).
-export const isWorkerCategory = (e) => e?.category === "Workers" || e?.category === "Casuals";
-export const statusesFor = (e) => (isWorkerCategory(e) ? STATUSES.filter((s) => s !== LS_STATUS) : STATUSES);
+// Admin Staff and Field Staff keep the normal "Leave" button (shown as LS only on the Salaries paysheets) and also get
+// "H.d leave sanctioned" (stored as "HD Leave"): it counts 0.5 in Present and the other 0.5 falls in LP.
+export const HD_LEAVE = "HD Leave";
+export const LEAVE_SANCTIONED = "LS"; // stored value of the "Leave sanctioned" button (paid; shown in the LS column)
+export const LS_CATEGORIES = ["Admin Staff", "Field Staff"];
+export const usesLeaveSanctioned = (emp) => LS_CATEGORIES.includes(emp?.category);
+export const statusesFor = (emp) =>
+  usesLeaveSanctioned(emp) ? ["Present", "Half day", HD_LEAVE, LEAVE_SANCTIONED, "Leave", "Absent", "Holiday"] : STATUSES;
+export const statusLabel = (status, emp) =>
+  status === HD_LEAVE ? "H.d leave sanctioned"
+    : status === LEAVE_SANCTIONED ? "Leave sanctioned"
+    : status;
 
 // merge:true so changing the status keeps an OT value already saved for that day.
 // ot (hours) is optional and only used for workers.
@@ -88,16 +96,14 @@ export function listenAttendanceDetails(startDate, endDate, callback, onError) {
 }
 
 // Count statuses per employee from a listenAttendance map.
-// -> { [employeeId]: { Present, "Half day", Leave, Absent, Holiday } }
+// -> { [employeeId]: { Present, "Half day", "HD Leave", Leave, Absent } }
 export function countsByEmployee(map) {
   const out = {};
   for (const [key, status] of Object.entries(map)) {
     const id = key.slice(0, key.lastIndexOf("_"));
-    out[id] = out[id] || { Present: 0, "Half day": 0, Leave: 0, Absent: 0, Holiday: 0 };
-    // Leave sanctioned is added to Present (shown as P + LS on the Attendance page).
-    // A plain Leave is NOT paid: it falls into loss of pay until it is changed to Leave sanctioned.
-    // A Holiday stays a paid day.
-    if (status === LS_STATUS) out[id].Present += 1;
+    out[id] = out[id] || { Present: 0, "Half day": 0, "HD Leave": 0, LS: 0, Holiday: 0, Leave: 0, Absent: 0 };
+    // A Holiday is a paid day, so payroll counts it with Leave (the sheet pays P + L).
+    if (status === "Holiday") { out[id].Leave += 1; out[id].Holiday += 1; }
     else if (status in out[id]) out[id][status] += 1;
   }
   return out;
