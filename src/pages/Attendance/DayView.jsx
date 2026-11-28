@@ -133,7 +133,7 @@ export default function DayView({ employees }) {
         {summary.map(([s, n]) => (
           <div key={s} className={`stat ${{ Present: "present", "Half day": "half", "HD Leave": "half", LS: "leave", Leave: "leave", Absent: "absent", Holiday: "holiday" }[s]}`}>
             <div className="label">{s === "Present" && showLs ? "P + LS" : statusLabel(s)}</div>
-            <div className="value">{s === "Present" && showLs ? `${n} + ${cnt(LEAVE_SANCTIONED)}` : n}</div>
+            <div className="value">{s === "Present" && showLs ? `${n} + ${cnt(LEAVE_SANCTIONED)} = ${n + cnt(LEAVE_SANCTIONED)}` : n}</div>
           </div>
         ))}
         <div className="stat"><div className="label">Not marked yet</div><div className="value">{unmarked}</div></div>

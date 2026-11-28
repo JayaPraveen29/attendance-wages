@@ -16,6 +16,8 @@ export const STATUS_BADGE = { Present: "green", "Half day": "amber", "HD Leave":
 // "H.d leave sanctioned" (stored as "HD Leave"): it counts 0.5 in Present and the other 0.5 falls in LP.
 export const HD_LEAVE = "HD Leave";
 export const LEAVE_SANCTIONED = "LS"; // stored value of the "Leave sanctioned" button (paid; shown in the LS column)
+// Older builds may have stored the button text itself; read it as LS.
+const normStatus = (st) => (st === "Leave sanctioned" ? "LS" : st);
 export const LS_CATEGORIES = ["Admin Staff", "Field Staff"];
 export const usesLeaveSanctioned = (emp) => LS_CATEGORIES.includes(emp?.category);
 export const statusesFor = (emp) =>
@@ -66,7 +68,7 @@ export function listenAttendance(startDate, endDate, callback, onError) {
       const map = {};
       snap.forEach((d) => {
         const x = d.data();
-        map[`${x.employeeId}_${x.date}`] = x.status;
+        map[`${x.employeeId}_${x.date}`] = normStatus(x.status);
       });
       callback(map);
     },
@@ -87,7 +89,7 @@ export function listenAttendanceDetails(startDate, endDate, callback, onError) {
       const map = {};
       snap.forEach((d) => {
         const x = d.data();
-        map[`${x.employeeId}_${x.date}`] = { status: x.status, ot: Number(x.ot) || 0 };
+        map[`${x.employeeId}_${x.date}`] = { status: normStatus(x.status), ot: Number(x.ot) || 0 };
       });
       callback(map);
     },
